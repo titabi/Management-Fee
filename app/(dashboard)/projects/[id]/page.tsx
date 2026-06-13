@@ -114,6 +114,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             isAdmin={isAdmin}
             contractValue={plSummary?.contract_value || 0}
             khBudget={plSummary?.kh_budget || 0}
+            khVeQuy={plSummary?.kh_ve_quy || 0}
           />
         </TabsContent>
 
@@ -124,6 +125,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             ntpExpenses={ntpExpenses || []}
             isAdmin={isAdmin}
             contractValue={plSummary?.contract_value || 0}
+            nccVeQuy={plSummary?.ncc_ve_quy || 0}
           />
         </TabsContent>
 

@@ -25,6 +25,7 @@ interface Props {
   isAdmin: boolean
   contractValue?: number
   khBudget?: number
+  khVeQuy?: number
 }
 
 const emptyForm = {
@@ -42,7 +43,7 @@ function pct(amount: number, base: number) {
   return ((amount / base) * 100).toFixed(1) + '%'
 }
 
-export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, contractValue, khBudget }: Props) {
+export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, contractValue, khBudget, khVeQuy }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -108,10 +109,14 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
     else { toast.success('Đã xóa!'); router.refresh() }
   }
 
+  const cpkh = khBudget || 0
+  const daTraKH = customerCosts.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
+  const traKHinPlan = customerCosts.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
+  const flexKH = cpkh - daTraKH - traKHinPlan
+  const veQuy = khVeQuy || 0
+  const phaiThu = flexKH - veQuy
+  const inQuy = veQuy - daTraKH
   const totalAll = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
-  const totalPlanned = customerCosts.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
-  const totalCompleted = customerCosts.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
-  const controlKH = (khBudget || 0) - totalAll
 
   // Group by customer_name
   const grouped: Record<string, CustomerCost[]> = {}
@@ -130,10 +135,10 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="h-4 w-4 text-purple-500" />
-              <p className="text-xs text-purple-700 font-medium">KH Budget</p>
+              <p className="text-xs text-purple-700 font-medium">CPKH</p>
             </div>
-            <p className="text-lg font-bold text-purple-800">{formatVND(khBudget || 0)}</p>
-            {contractValue ? <p className="text-xs text-purple-500 mt-0.5">{pct(khBudget || 0, contractValue)} giá bán</p> : null}
+            <p className="text-lg font-bold text-purple-800">{formatVND(cpkh)}</p>
+            {contractValue ? <p className="text-xs text-purple-500 mt-0.5">{pct(cpkh, contractValue)} giá bán</p> : null}
           </CardContent>
         </Card>
 
@@ -141,10 +146,9 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-4 w-4 text-red-500" />
-              <p className="text-xs text-red-700 font-medium">Tổng đã chi</p>
+              <p className="text-xs text-red-700 font-medium">Đã Trả KH</p>
             </div>
-            <p className="text-lg font-bold text-red-800">{formatVND(totalCompleted)}</p>
-            <p className="text-xs text-red-500 mt-0.5">Kế hoạch: {formatVND(totalPlanned)}</p>
+            <p className="text-lg font-bold text-red-800">{formatVND(daTraKH)}</p>
           </CardContent>
         </Card>
 
@@ -152,21 +156,53 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <Users className="h-4 w-4 text-yellow-600" />
-              <p className="text-xs text-yellow-700 font-medium">Tổng kế hoạch</p>
+              <p className="text-xs text-yellow-700 font-medium">Trả KH in Plan</p>
             </div>
-            <p className="text-lg font-bold text-yellow-800">{formatVND(totalAll)}</p>
+            <p className="text-lg font-bold text-yellow-800">{formatVND(traKHinPlan)}</p>
             <p className="text-xs text-yellow-600 mt-0.5">{customerCosts.length} mục chi phí</p>
           </CardContent>
         </Card>
 
-        <Card className={`border-2 ${controlKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
+        <Card className={`border-2 ${flexKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <ShieldCheck className="h-4 w-4 text-blue-500" />
-              <p className="text-xs text-blue-700 font-medium">Tiền control KH</p>
+              <p className="text-xs text-blue-700 font-medium">Flex KH</p>
             </div>
-            <p className={`text-lg font-bold ${controlKH >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(controlKH)}</p>
-            <p className="text-xs text-blue-500 mt-0.5">KH Budget - Tổng chi phí</p>
+            <p className={`text-lg font-bold ${flexKH >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(flexKH)}</p>
+            <p className="text-xs text-blue-500 mt-0.5">CPKH − Đã trả − in Plan</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-200 bg-emerald-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-4 w-4 text-emerald-500" />
+              <p className="text-xs text-emerald-700 font-medium">CPKH về Quỹ</p>
+            </div>
+            <p className="text-lg font-bold text-emerald-800">{formatVND(veQuy)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="h-4 w-4 text-orange-500" />
+              <p className="text-xs text-orange-700 font-medium">CPKH phải Thu</p>
+            </div>
+            <p className={`text-lg font-bold ${phaiThu >= 0 ? 'text-orange-800' : 'text-red-700'}`}>{formatVND(phaiThu)}</p>
+            <p className="text-xs text-orange-500 mt-0.5">Flex KH − về Quỹ</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-2 ${inQuy >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-4 w-4 text-green-600" />
+              <p className="text-xs text-green-700 font-medium">CPKH in Quỹ</p>
+            </div>
+            <p className={`text-lg font-bold ${inQuy >= 0 ? 'text-green-800' : 'text-red-700'}`}>{formatVND(inQuy)}</p>
+            <p className="text-xs text-green-600 mt-0.5">về Quỹ − Đã trả KH</p>
           </CardContent>
         </Card>
       </div>
@@ -239,20 +275,20 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
           {customerCosts.length > 0 && (
             <div className="flex justify-end gap-6 mt-3 pt-3 border-t flex-wrap">
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-0.5">Kế hoạch</p>
-                <p className="font-semibold text-yellow-700">{formatVND(totalPlanned)}</p>
+                <p className="text-xs text-gray-500 mb-0.5">Trả KH in Plan</p>
+                <p className="font-semibold text-yellow-700">{formatVND(traKHinPlan)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-0.5">Đã chi</p>
-                <p className="font-semibold text-green-700">{formatVND(totalCompleted)}</p>
+                <p className="text-xs text-gray-500 mb-0.5">Đã Trả KH</p>
+                <p className="font-semibold text-green-700">{formatVND(daTraKH)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500 mb-0.5">Tổng cộng</p>
                 <p className="font-bold text-lg">{formatVND(totalAll)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-0.5">Tiền control KH</p>
-                <p className={`font-bold text-lg ${controlKH >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlKH)}</p>
+                <p className="text-xs text-gray-500 mb-0.5">Flex KH</p>
+                <p className={`font-bold text-lg ${flexKH >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(flexKH)}</p>
               </div>
             </div>
           )}

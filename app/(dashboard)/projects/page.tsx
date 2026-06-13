@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatVND, formatDate } from '@/lib/utils/format'
+import { formatVND } from '@/lib/utils/format'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -30,7 +30,7 @@ export default async function ProjectsPage() {
     supabase.from('ncc_items').select('project_id, contract_amount'),
     supabase.from('ntp_expenses').select('project_id, amount, status'),
     supabase.from('customer_costs').select('project_id, amount, status'),
-    supabase.from('pl_summary').select('project_id, kh_budget'),
+    supabase.from('pl_summary').select('project_id, kh_budget, ncc_ve_quy, kh_ve_quy'),
   ])
 
   const isAdmin = (profile as Profile | null)?.role === 'admin'
@@ -43,23 +43,23 @@ export default async function ProjectsPage() {
 
     const nccContract = ncc.reduce((s, c) => s + (c.contract_amount || 0), 0)
     const ntpAll = expenses.reduce((s, e) => s + (e.amount || 0), 0)
-    const ntpPlanned = expenses.filter(e => e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
     const ntpCompleted = expenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
     const khAll = costs.reduce((s, c) => s + (c.amount || 0), 0)
-    const khPlanned = costs.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
     const khCompleted = costs.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
     const khBudget = pl?.kh_budget || 0
+    const nccVeQuy = pl?.ncc_ve_quy || 0
+    const khVeQuy = pl?.kh_ve_quy || 0
 
     const flexNcc = nccContract - ntpAll
     const flexKH = khBudget - khAll
     const flexProject = flexNcc + flexKH
 
-    const tienChiNcc = ntpAll
-    const cpkh = khAll
-    const tienPhaiChiKeHoach = khPlanned + ntpPlanned
-    const tienDaChi = khCompleted + ntpCompleted
+    const cpkh = khBudget
+    const cpkhInQuy = khVeQuy - khCompleted
+    const nccInQuy = nccVeQuy - ntpCompleted
+    const tongPhaiThu = (nccContract - nccVeQuy) + (flexKH - khVeQuy)
 
-    return { ...project, tienChiNcc, cpkh, flexProject, tienPhaiChiKeHoach, tienDaChi }
+    return { ...project, flexProject, cpkh, cpkhInQuy, nccContract, nccInQuy, tongPhaiThu }
   })
 
   return (
@@ -85,13 +85,13 @@ export default async function ProjectsPage() {
                     <TableHead>Mã dự án</TableHead>
                     <TableHead>Tên dự án</TableHead>
                     <TableHead>Khách hàng</TableHead>
-                    <TableHead className="text-right">Tiền chi NCC/NTP</TableHead>
-                    <TableHead className="text-right">CPKH</TableHead>
                     <TableHead className="text-right">Flex Project</TableHead>
-                    <TableHead className="text-right">Phải chi (kế hoạch)</TableHead>
-                    <TableHead className="text-right">Đã chi</TableHead>
+                    <TableHead className="text-right">CPKH</TableHead>
+                    <TableHead className="text-right">CPKH in Quỹ</TableHead>
+                    <TableHead className="text-right">Tổng GT NCC</TableHead>
+                    <TableHead className="text-right">NCC in Quỹ</TableHead>
+                    <TableHead className="text-right">Tổng phải thu</TableHead>
                     <TableHead>Trạng thái</TableHead>
-                    <TableHead>Ngày tạo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -110,20 +110,23 @@ export default async function ProjectsPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-gray-600">{project.client_name}</TableCell>
-                      <TableCell className="text-right text-orange-600 font-medium">
-                        {formatVND(project.tienChiNcc)}
+                      <TableCell className={`text-right font-bold ${project.flexProject >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {formatVND(project.flexProject)}
                       </TableCell>
                       <TableCell className="text-right text-purple-600 font-medium">
                         {formatVND(project.cpkh)}
                       </TableCell>
-                      <TableCell className={`text-right font-bold ${project.flexProject >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {formatVND(project.flexProject)}
+                      <TableCell className={`text-right font-medium ${project.cpkhInQuy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatVND(project.cpkhInQuy)}
                       </TableCell>
-                      <TableCell className="text-right text-yellow-600 font-medium">
-                        {formatVND(project.tienPhaiChiKeHoach)}
+                      <TableCell className="text-right text-orange-600 font-medium">
+                        {formatVND(project.nccContract)}
                       </TableCell>
-                      <TableCell className="text-right text-red-600 font-medium">
-                        {formatVND(project.tienDaChi)}
+                      <TableCell className={`text-right font-medium ${project.nccInQuy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatVND(project.nccInQuy)}
+                      </TableCell>
+                      <TableCell className="text-right text-amber-600 font-medium">
+                        {formatVND(project.tongPhaiThu)}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -137,9 +140,6 @@ export default async function ProjectsPage() {
                         >
                           {statusLabels[project.status]}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-500 text-sm">
-                        {formatDate(project.created_at)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
     supabase.from('ntp_expenses').select('project_id, amount, status'),
     supabase.from('customer_costs').select('project_id, amount, status'),
-    supabase.from('pl_summary').select('project_id, contract_value, p11_profit, kh_budget'),
+    supabase.from('pl_summary').select('project_id, contract_value, p11_profit, kh_budget, ncc_ve_quy, kh_ve_quy'),
   ])
 
   const totalProjects = projects?.length || 0
@@ -39,8 +39,18 @@ export default async function DashboardPage() {
   const totalCustomerCosts = customerCosts?.reduce((s, c) => s + (c.amount || 0), 0) || 0
   const totalControlKH = totalKhBudget - totalCustomerCosts
 
-  // Tổng Manage = KH control + NCC control
+  // Tổng Manage = KH control + NCC control (= Flex Project)
   const totalManage = totalControlKH + totalControlNcc
+
+  // "Về Quỹ" aggregates
+  const totalNccVeQuy = plSummaries?.reduce((s, p) => s + (p.ncc_ve_quy || 0), 0) || 0
+  const totalKhVeQuy = plSummaries?.reduce((s, p) => s + (p.kh_ve_quy || 0), 0) || 0
+  const totalNtpCompleted = ntpExpenses?.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0) || 0
+  const totalKhCompleted = customerCosts?.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0) || 0
+  // Money in Quỹ = Σ(NCC in Quỹ) + Σ(CPKH in Quỹ)
+  const moneyInQuy = (totalNccVeQuy - totalNtpCompleted) + (totalKhVeQuy - totalKhCompleted)
+  // Money phải thu = Σ(NCC phải thu) + Σ(CPKH phải thu)
+  const moneyPhaiThu = (totalNccContract - totalNccVeQuy) + (totalControlKH - totalKhVeQuy)
 
   const statusLabels: Record<string, string> = {
     active: 'Đang hoạt động',
@@ -78,9 +88,9 @@ export default async function DashboardPage() {
       { label: 'Flex CPKH', value: formatVND(totalControlKH), accent: totalControlKH >= 0 ? 'text-sky-600' : 'text-red-600' },
       { label: 'CPKH', value: formatVND(totalCustomerCosts), accent: 'text-purple-600' },
     ] },
-    { title: 'Flex NCC/NTP / CP NCC/NTP', icon: Wallet, gradient: 'from-orange-500 to-amber-500', rows: [
-      { label: 'Flex NCC/NTP', value: formatVND(totalControlNcc), accent: totalControlNcc >= 0 ? 'text-orange-600' : 'text-red-600' },
-      { label: 'CP NCC/NTP', value: formatVND(totalNccContract), accent: 'text-amber-700' },
+    { title: 'Flex NCC / CP NCC', icon: Wallet, gradient: 'from-orange-500 to-amber-500', rows: [
+      { label: 'Flex NCC', value: formatVND(totalControlNcc), accent: totalControlNcc >= 0 ? 'text-orange-600' : 'text-red-600' },
+      { label: 'CP NCC', value: formatVND(totalNccContract), accent: 'text-amber-700' },
     ] },
   ]
 
@@ -103,19 +113,27 @@ export default async function DashboardPage() {
         <div className="relative flex items-center justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-2 text-blue-200 text-sm font-medium mb-2">
-              <ShieldCheck className="h-4 w-4" /> Tổng Tiền Flex
+              <ShieldCheck className="h-4 w-4" /> Flex Project
             </div>
             <p className="text-4xl font-bold text-white tracking-tight">{formatVND(totalManage)}</p>
-            <p className="text-blue-300/80 text-sm mt-1">Flex CPKH + Flex NCC/NTP · trên {totalProjects} dự án</p>
+            <p className="text-blue-300/80 text-sm mt-1">Flex CPKH + Flex NCC · trên {totalProjects} dự án</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
               <p className="text-xs text-blue-200">Flex CPKH</p>
               <p className="text-lg font-semibold text-white">{formatVND(totalControlKH)}</p>
             </div>
             <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
-              <p className="text-xs text-blue-200">Flex NCC/NTP</p>
+              <p className="text-xs text-blue-200">Flex NCC</p>
               <p className="text-lg font-semibold text-white">{formatVND(totalControlNcc)}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-400/15 backdrop-blur px-4 py-3 border border-emerald-300/20">
+              <p className="text-xs text-emerald-200">Money in Quỹ</p>
+              <p className="text-lg font-semibold text-white">{formatVND(moneyInQuy)}</p>
+            </div>
+            <div className="rounded-xl bg-amber-400/15 backdrop-blur px-4 py-3 border border-amber-300/20">
+              <p className="text-xs text-amber-200">Money phải thu</p>
+              <p className="text-lg font-semibold text-white">{formatVND(moneyPhaiThu)}</p>
             </div>
           </div>
         </div>

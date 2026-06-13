@@ -74,6 +74,8 @@ export interface PLSummary {
   p11_profit: number
   kh_budget: number
   ncc_budget: number
+  kh_ve_quy: number
+  ncc_ve_quy: number
   excel_file_name: string | null
   note: string | null
   updated_at: string

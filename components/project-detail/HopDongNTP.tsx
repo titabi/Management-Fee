@@ -38,6 +38,7 @@ interface Props {
   ntpExpenses: NtpExpense[]
   isAdmin: boolean
   contractValue?: number
+  nccVeQuy?: number
 }
 
 const emptyNccForm = {
@@ -63,7 +64,7 @@ function pct(amount: number, base: number) {
   return ((amount / base) * 100).toFixed(1) + '%'
 }
 
-export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, contractValue }: Props) {
+export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, contractValue, nccVeQuy }: Props) {
   const router = useRouter()
   const [expandedNcc, setExpandedNcc] = useState<Set<string>>(new Set())
   const [nccDialogOpen, setNccDialogOpen] = useState(false)
@@ -200,6 +201,10 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
   const totalNtpPlanned = ntpExpenses.filter(e => e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
   const totalNtpCompleted = ntpExpenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
   const totalControlNcc = totalNccContract - totalNtpAll
+  const flexNcc = totalControlNcc
+  const veQuy = nccVeQuy || 0
+  const nccPhaiThu = totalNccContract - veQuy
+  const nccInQuy = veQuy - totalNtpCompleted
 
   return (
     <div className="mt-4 space-y-4">
@@ -209,7 +214,7 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <BarChart3 className="h-4 w-4 text-orange-500" />
-              <p className="text-xs text-orange-700 font-medium">Tổng giá trị HĐ NCC</p>
+              <p className="text-xs text-orange-700 font-medium">Tổng GT NCC</p>
             </div>
             <p className="text-lg font-bold text-orange-800">{formatVND(totalNccContract)}</p>
             {contractValue ? <p className="text-xs text-orange-500 mt-0.5">{pct(totalNccContract, contractValue)} giá bán</p> : null}
@@ -220,10 +225,9 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-4 w-4 text-red-500" />
-              <p className="text-xs text-red-700 font-medium">Tổng đã chi</p>
+              <p className="text-xs text-red-700 font-medium">Đã trả NCC</p>
             </div>
             <p className="text-lg font-bold text-red-800">{formatVND(totalNtpCompleted)}</p>
-            <p className="text-xs text-red-500 mt-0.5">Kế hoạch: {formatVND(totalNtpPlanned)}</p>
           </CardContent>
         </Card>
 
@@ -231,21 +235,53 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="h-4 w-4 text-yellow-600" />
-              <p className="text-xs text-yellow-700 font-medium">Tổng kế hoạch</p>
+              <p className="text-xs text-yellow-700 font-medium">Trả NCC in Plan</p>
             </div>
-            <p className="text-lg font-bold text-yellow-800">{formatVND(totalNtpAll)}</p>
+            <p className="text-lg font-bold text-yellow-800">{formatVND(totalNtpPlanned)}</p>
             <p className="text-xs text-yellow-600 mt-0.5">{ntpExpenses.length} mục chi tiêu</p>
           </CardContent>
         </Card>
 
-        <Card className={`border-2 ${totalControlNcc >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
+        <Card className={`border-2 ${flexNcc >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
               <ShieldCheck className="h-4 w-4 text-blue-500" />
-              <p className="text-xs text-blue-700 font-medium">Tiền control NCC</p>
+              <p className="text-xs text-blue-700 font-medium">Flex NCC</p>
             </div>
-            <p className={`text-lg font-bold ${totalControlNcc >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(totalControlNcc)}</p>
-            <p className="text-xs text-blue-500 mt-0.5">HĐ NCC - Tổng chi NTP</p>
+            <p className={`text-lg font-bold ${flexNcc >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(flexNcc)}</p>
+            <p className="text-xs text-blue-500 mt-0.5">GT NCC − Đã trả − in Plan</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-200 bg-emerald-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-4 w-4 text-emerald-500" />
+              <p className="text-xs text-emerald-700 font-medium">NCC về Quỹ</p>
+            </div>
+            <p className="text-lg font-bold text-emerald-800">{formatVND(veQuy)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-200 bg-purple-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="h-4 w-4 text-purple-500" />
+              <p className="text-xs text-purple-700 font-medium">NCC Phải thu</p>
+            </div>
+            <p className={`text-lg font-bold ${nccPhaiThu >= 0 ? 'text-purple-800' : 'text-red-700'}`}>{formatVND(nccPhaiThu)}</p>
+            <p className="text-xs text-purple-500 mt-0.5">GT NCC − về Quỹ</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-2 ${nccInQuy >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-4 w-4 text-green-600" />
+              <p className="text-xs text-green-700 font-medium">NCC in Quỹ</p>
+            </div>
+            <p className={`text-lg font-bold ${nccInQuy >= 0 ? 'text-green-800' : 'text-red-700'}`}>{formatVND(nccInQuy)}</p>
+            <p className="text-xs text-green-600 mt-0.5">về Quỹ − Đã trả NCC</p>
           </CardContent>
         </Card>
       </div>
