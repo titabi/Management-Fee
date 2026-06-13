@@ -31,19 +31,21 @@ export interface CustomerCost {
   created_at: string
 }
 
-export type NtpContractStatus = 'pending' | 'active' | 'completed'
+export type NccItemStatus = 'pending' | 'active' | 'completed'
 
-export interface NtpContract {
+export interface NCCItem {
   id: string
   project_id: string
-  ntp_name: string
+  name: string
   contract_amount: number
   received_amount: number
-  status: NtpContractStatus
-  date: string
+  status: NccItemStatus
   note: string | null
   created_at: string
 }
+
+// Alias for backward compat within components
+export type NccItem = NCCItem
 
 export type NtpExpenseCategory = 'Phát sinh' | 'Mua vật tư' | 'Thuê CTV' | 'Thuê thợ' | 'Khác'
 export type NtpExpenseStatus = 'planned' | 'completed'
@@ -51,7 +53,7 @@ export type NtpExpenseStatus = 'planned' | 'completed'
 export interface NtpExpense {
   id: string
   project_id: string
-  ntp_contract_id: string | null
+  ncc_item_id: string | null
   category: string
   description: string
   planned_amount: number
@@ -62,16 +64,18 @@ export interface NtpExpense {
   created_at: string
 }
 
-export interface PlEntry {
+export interface PLSummary {
   id: string
   project_id: string
-  category: string
-  revenue: number
-  cost: number
+  contract_value: number
+  p11_profit: number
+  excel_file_name: string | null
   note: string | null
-  date: string
-  created_at: string
+  updated_at: string
 }
+
+// Alias
+export type PlSummary = PLSummary
 
 export type CommitmentType = 'Chi phí hãng' | 'Phí môi giới' | 'Khác'
 export type CommitmentStatus = 'pending' | 'paid'
@@ -90,7 +94,7 @@ export interface OtherCommitment {
 }
 
 export interface ProjectSummary {
-  totalFromNtp: number
+  totalFromNcc: number
   totalPlanned: number
   totalSpent: number
   balance: number

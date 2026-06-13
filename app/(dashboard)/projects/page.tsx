@@ -20,13 +20,13 @@ export default async function ProjectsPage() {
   const [
     { data: profile },
     { data: projects },
-    { data: ntpContracts },
+    { data: nccItems },
     { data: ntpExpenses },
     { data: otherCommitments },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ntp_contracts').select('project_id, received_amount'),
+    supabase.from('ncc_items').select('project_id, received_amount'),
     supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
     supabase.from('other_commitments').select('project_id, amount, paid_amount'),
   ])
@@ -34,11 +34,11 @@ export default async function ProjectsPage() {
   const isAdmin = (profile as Profile | null)?.role === 'admin'
 
   const projectsWithStats = (projects || []).map((project) => {
-    const ntp = ntpContracts?.filter((c) => c.project_id === project.id) || []
+    const ncc = nccItems?.filter((c) => c.project_id === project.id) || []
     const expenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
     const commitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
 
-    const totalFromNtp = ntp.reduce((s, c) => s + (c.received_amount || 0), 0)
+    const totalFromNtp = ncc.reduce((s, c) => s + (c.received_amount || 0), 0)
     const totalPlanned =
       expenses.reduce((s, e) => s + (e.planned_amount || 0), 0) +
       commitments.reduce((s, c) => s + (c.amount || 0), 0)
@@ -72,7 +72,7 @@ export default async function ProjectsPage() {
                     <TableHead>Mã dự án</TableHead>
                     <TableHead>Tên dự án</TableHead>
                     <TableHead>Khách hàng</TableHead>
-                    <TableHead className="text-right">Tiền NTP</TableHead>
+                    <TableHead className="text-right">Tiền nhận NCC</TableHead>
                     <TableHead className="text-right">Đã chi</TableHead>
                     <TableHead className="text-right">Số dư</TableHead>
                     <TableHead>Trạng thái</TableHead>

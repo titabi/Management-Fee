@@ -11,18 +11,18 @@ export default async function DashboardPage() {
 
   const [
     { data: projects },
-    { data: ntpContracts },
+    { data: nccItems },
     { data: ntpExpenses },
     { data: otherCommitments },
   ] = await Promise.all([
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ntp_contracts').select('project_id, received_amount'),
+    supabase.from('ncc_items').select('project_id, received_amount'),
     supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
     supabase.from('other_commitments').select('project_id, amount, paid_amount'),
   ])
 
   const totalProjects = projects?.length || 0
-  const totalFromNtp = ntpContracts?.reduce((s, c) => s + (c.received_amount || 0), 0) || 0
+  const totalFromNtp = nccItems?.reduce((s, c) => s + (c.received_amount || 0), 0) || 0
   const totalPlanned =
     (ntpExpenses?.reduce((s, e) => s + (e.planned_amount || 0), 0) || 0) +
     (otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0)
@@ -32,11 +32,11 @@ export default async function DashboardPage() {
 
   // Per-project chart data
   const chartData = (projects || []).map((project) => {
-    const projectNtp = ntpContracts?.filter((c) => c.project_id === project.id) || []
+    const projectNcc = nccItems?.filter((c) => c.project_id === project.id) || []
     const projectExpenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
     const projectCommitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
 
-    const tienCo = projectNtp.reduce((s, c) => s + (c.received_amount || 0), 0)
+    const tienCo = projectNcc.reduce((s, c) => s + (c.received_amount || 0), 0)
     const tienChi =
       projectExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
       projectCommitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
@@ -82,12 +82,12 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng tiền từ NTP</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng tiền nhận từ NCC</CardTitle>
             <TrendingUp className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">{formatVND(totalFromNtp)}</p>
-            <p className="text-xs text-gray-500 mt-1">tiền nhận từ Nhà Thầu Phụ</p>
+            <p className="text-xs text-gray-500 mt-1">tiền nhận từ NCC / Nhà Thầu Phụ</p>
           </CardContent>
         </Card>
 
@@ -138,10 +138,10 @@ export default async function DashboardPage() {
           {projects && projects.length > 0 ? (
             <div className="space-y-3">
               {projects.slice(0, 5).map((project) => {
-                const projectNtp = ntpContracts?.filter((c) => c.project_id === project.id) || []
+                const projectNcc = nccItems?.filter((c) => c.project_id === project.id) || []
                 const projectExpenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
                 const projectCommitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
-                const tienCo = projectNtp.reduce((s, c) => s + (c.received_amount || 0), 0)
+                const tienCo = projectNcc.reduce((s, c) => s + (c.received_amount || 0), 0)
                 const tienChi =
                   projectExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
                   projectCommitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
