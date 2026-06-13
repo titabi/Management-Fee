@@ -8,9 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Building2, CheckCircle2 } from 'lucide-react'
+import { Building2, CheckCircle2, Lock } from 'lucide-react'
 
 export default function RegisterPage() {
+  const [step, setStep] = useState<'invite' | 'form'>('invite')
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteError, setInviteError] = useState('')
+
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,6 +22,17 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  function handleInviteCheck(e: React.FormEvent) {
+    e.preventDefault()
+    const serverCode = process.env.NEXT_PUBLIC_INVITE_CODE || 'NTP2026'
+    if (inviteCode.trim() === serverCode) {
+      setStep('form')
+      setInviteError('')
+    } else {
+      setInviteError('Mã mời không đúng. Liên hệ quản trị viên để được cấp mã.')
+    }
+  }
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -56,6 +71,50 @@ export default function RegisterPage() {
             <Button className="w-full mt-2">Đăng nhập ngay →</Button>
           </Link>
         </CardContent>
+      </Card>
+    )
+  }
+
+  if (step === 'invite') {
+    return (
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="text-center space-y-2">
+          <div className="flex justify-center">
+            <div className="bg-blue-600 p-3 rounded-full">
+              <Lock className="h-8 w-8 text-white" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold">Nhập Mã Mời</CardTitle>
+          <CardDescription>Bạn cần mã mời từ quản trị viên để đăng ký</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleInviteCheck} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="inviteCode">Mã mời</Label>
+              <Input
+                id="inviteCode"
+                type="text"
+                placeholder="Nhập mã mời..."
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            {inviteError && (
+              <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{inviteError}</p>
+            )}
+            <Button type="submit" className="w-full">Xác nhận mã →</Button>
+          </form>
+        </CardContent>
+        <CardFooter className="justify-center">
+          <p className="text-sm text-muted-foreground">
+            Đã có tài khoản?{' '}
+            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+              Đăng nhập
+            </Link>
+          </p>
+        </CardFooter>
       </Card>
     )
   }
