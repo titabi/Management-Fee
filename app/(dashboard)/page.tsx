@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import DashboardChart from '@/components/dashboard/DashboardChart'
-import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users } from 'lucide-react'
+import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users, ShieldCheck } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -13,54 +13,34 @@ export default async function DashboardPage() {
     { data: projects },
     { data: nccItems },
     { data: ntpExpenses },
-    { data: otherCommitments },
     { data: customerCosts },
+    { data: plSummaries },
   ] = await Promise.all([
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
     supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
-    supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
-    supabase.from('other_commitments').select('project_id, amount, paid_amount'),
+    supabase.from('ntp_expenses').select('project_id, amount, status'),
     supabase.from('customer_costs').select('project_id, amount, status'),
+    supabase.from('pl_summary').select('project_id, contract_value, p11_profit, kh_budget'),
   ])
 
   const totalProjects = projects?.length || 0
-  const totalFromNtp = nccItems?.reduce((s, c) => s + (c.received_amount || 0), 0) || 0
+
+  // Revenue
+  const totalRevenue = plSummaries?.reduce((s, p) => s + (p.contract_value || 0), 0) || 0
+  const totalP11 = plSummaries?.reduce((s, p) => s + (p.p11_profit || 0), 0) || 0
+
+  // NCC control: per project = ncc.contract_amount - Σ(ntp_expenses.amount)
   const totalNccContract = nccItems?.reduce((s, c) => s + (c.contract_amount || 0), 0) || 0
-  const totalNtpActual = ntpExpenses?.reduce((s, e) => s + (e.actual_amount || 0), 0) || 0
-  // NCC còn lại = tổng HĐ - tổng đã chi NTP
-  const nccConLai = Math.max(0, totalNccContract - totalNtpActual)
-  const nccDaChi = totalNtpActual
-  // Chi phí KH
-  const khConLai = customerCosts?.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0) || 0
-  const khDaChi = customerCosts?.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0) || 0
-  const totalCustomerCosts = khConLai + khDaChi
-  // Tổng cần Manage = KH còn lại + NCC còn lại
-  const totalCanManage = khConLai + nccConLai
-  const totalPlanned =
-    (ntpExpenses?.reduce((s, e) => s + (e.planned_amount || 0), 0) || 0) +
-    (otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0) +
-    totalCustomerCosts
-  const totalSpent = totalNtpActual +
-    (otherCommitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0) + khDaChi
+  const totalNtpAll = ntpExpenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0
+  const totalControlNcc = totalNccContract - totalNtpAll
 
-  // Per-project chart data
-  const chartData = (projects || []).map((project) => {
-    const projectNcc = nccItems?.filter((c) => c.project_id === project.id) || []
-    const projectExpenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
-    const projectCommitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
+  // KH control: per project = kh_budget - Σ(customer_costs.amount)
+  const totalKhBudget = plSummaries?.reduce((s, p) => s + (p.kh_budget || 0), 0) || 0
+  const totalCustomerCosts = customerCosts?.reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const totalControlKH = totalKhBudget - totalCustomerCosts
 
-    const tienCo = projectNcc.reduce((s, c) => s + (c.received_amount || 0), 0)
-    const tienChi =
-      projectExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
-      projectCommitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
-
-    return {
-      name: project.code,
-      fullName: project.name,
-      tienCo,
-      tienChi,
-    }
-  })
+  // Tổng Manage = KH control + NCC control
+  const totalManage = totalControlKH + totalControlNcc
 
   const statusLabels: Record<string, string> = {
     active: 'Đang hoạt động',
@@ -73,6 +53,15 @@ export default async function DashboardPage() {
     paused: 'outline',
   }
 
+  // Per-project chart data
+  const chartData = (projects || []).map((project) => {
+    const projectNcc = nccItems?.filter((c) => c.project_id === project.id) || []
+    const projectExpenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
+    const tienCo = projectNcc.reduce((s, c) => s + (c.received_amount || 0), 0)
+    const tienChi = projectExpenses.reduce((s, e) => s + (e.amount || 0), 0)
+    return { name: project.code, fullName: project.name, tienCo, tienChi }
+  })
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -81,7 +70,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Tổng dự án</CardTitle>
@@ -95,70 +84,78 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng tiền nhận từ NCC</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng doanh thu</CardTitle>
             <TrendingUp className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">{formatVND(totalFromNtp)}</p>
-            <p className="text-xs text-gray-500 mt-1">tiền nhận từ NCC / Nhà Thầu Phụ</p>
+            <p className="text-2xl font-bold text-green-600">{formatVND(totalRevenue)}</p>
+            <p className="text-xs text-gray-500 mt-1">Tổng giá trị HĐ tất cả dự án</p>
           </CardContent>
         </Card>
 
-        {/* Chi phí KH */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-purple-700">👥 Chi phí KH còn lại</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng P11 đã ký</CardTitle>
+            <BarChart3 className="h-5 w-5 text-indigo-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-indigo-600">{formatVND(totalP11)}</p>
+            <p className="text-xs text-gray-500 mt-1">Lợi nhuận P11 tổng hợp</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-300 bg-blue-50">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Tổng tiền phải Manage</CardTitle>
+            <ShieldCheck className="h-5 w-5 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-800">{formatVND(totalManage)}</p>
+            <p className="text-xs text-blue-500 mt-1">Control KH + Control NCC</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng CP Khách Hàng</CardTitle>
             <Users className="h-5 w-5 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-yellow-600">{formatVND(khConLai)}</p>
-            <p className="text-xs text-gray-500 mt-1">Đã chi: <span className="text-green-600 font-medium">{formatVND(khDaChi)}</span></p>
+            <p className="text-2xl font-bold text-purple-600">{formatVND(totalCustomerCosts)}</p>
+            <p className="text-xs text-gray-500 mt-1">{customerCosts?.length || 0} mục chi phí KH</p>
           </CardContent>
         </Card>
 
-        {/* NCC còn lại */}
-        <Card>
+        <Card className={totalControlKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-orange-700">🏗️ NCC còn lại</CardTitle>
-            <TrendingUp className="h-5 w-5 text-orange-500" />
+            <CardTitle className={`text-sm font-medium ${totalControlKH >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Tổng Tiền control KH</CardTitle>
+            <ShieldCheck className={`h-5 w-5 ${totalControlKH >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-600">{formatVND(nccConLai)}</p>
-            <p className="text-xs text-gray-500 mt-1">Đã chi NTP: <span className="text-red-600 font-medium">{formatVND(nccDaChi)}</span></p>
-          </CardContent>
-        </Card>
-
-        {/* Tổng cần Manage */}
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700">💼 Tổng cần Manage</CardTitle>
-            <BarChart3 className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-blue-700">{formatVND(totalCanManage)}</p>
-            <p className="text-xs text-blue-500 mt-1">KH còn lại + NCC còn lại</p>
+            <p className={`text-2xl font-bold ${totalControlKH >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(totalControlKH)}</p>
+            <p className="text-xs text-gray-500 mt-1">KH Budget - Tổng chi phí KH</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng chi kế hoạch</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng CP NCC/NTP</CardTitle>
             <Wallet className="h-5 w-5 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-600">{formatVND(totalPlanned)}</p>
-            <p className="text-xs text-gray-500 mt-1">NTP + cam kết + chi phí KH</p>
+            <p className="text-2xl font-bold text-orange-600">{formatVND(totalNccContract)}</p>
+            <p className="text-xs text-gray-500 mt-1">Tổng giá trị HĐ các NCC</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={totalControlNcc >= 0 ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng đã chi</CardTitle>
-            <TrendingDown className="h-5 w-5 text-red-500" />
+            <CardTitle className={`text-sm font-medium ${totalControlNcc >= 0 ? 'text-orange-700' : 'text-red-700'}`}>Tổng Tiền control NCC</CardTitle>
+            <TrendingDown className={`h-5 w-5 ${totalControlNcc >= 0 ? 'text-orange-500' : 'text-red-500'}`} />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-600">{formatVND(totalSpent)}</p>
-            <p className="text-xs text-gray-500 mt-1">NTP + cam kết + KH đã chi</p>
+            <p className={`text-2xl font-bold ${totalControlNcc >= 0 ? 'text-orange-700' : 'text-red-700'}`}>{formatVND(totalControlNcc)}</p>
+            <p className="text-xs text-gray-500 mt-1">HĐ NCC - Tổng chi NTP</p>
           </CardContent>
         </Card>
       </div>
@@ -187,14 +184,16 @@ export default async function DashboardPage() {
           {projects && projects.length > 0 ? (
             <div className="space-y-3">
               {projects.slice(0, 5).map((project) => {
+                const projectPl = plSummaries?.find(p => p.project_id === project.id)
                 const projectNcc = nccItems?.filter((c) => c.project_id === project.id) || []
-                const projectExpenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
-                const projectCommitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
-                const tienCo = projectNcc.reduce((s, c) => s + (c.received_amount || 0), 0)
-                const tienChi =
-                  projectExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
-                  projectCommitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
-                const soDu = tienCo - tienChi
+                const projectExp = ntpExpenses?.filter((e) => e.project_id === project.id) || []
+                const projectCosts = customerCosts?.filter((c) => c.project_id === project.id) || []
+                const nccTotal = projectNcc.reduce((s, c) => s + (c.contract_amount || 0), 0)
+                const ntpTotal = projectExp.reduce((s, e) => s + (e.amount || 0), 0)
+                const khTotal = projectCosts.reduce((s, c) => s + (c.amount || 0), 0)
+                const controlNcc = nccTotal - ntpTotal
+                const controlKH = (projectPl?.kh_budget || 0) - khTotal
+                const manage = controlNcc + controlKH
 
                 return (
                   <Link key={project.id} href={`/projects/${project.id}`}>
@@ -210,9 +209,9 @@ export default async function DashboardPage() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right hidden sm:block">
-                          <p className="text-xs text-gray-500">Số dư</p>
-                          <p className={`text-sm font-semibold ${soDu >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatVND(soDu)}
+                          <p className="text-xs text-gray-500">Tổng Manage</p>
+                          <p className={`text-sm font-semibold ${manage >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                            {formatVND(manage)}
                           </p>
                         </div>
                         <Badge variant={statusColors[project.status]}>

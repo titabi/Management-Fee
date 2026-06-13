@@ -6,21 +6,23 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Building2, LayoutDashboard, FolderOpen, LogOut } from 'lucide-react'
+import { Building2, LayoutDashboard, FolderOpen, LogOut, Settings } from 'lucide-react'
 import { Profile } from '@/types'
 
 interface SidebarProps {
   profile: Profile | null
 }
 
-const navItems = [
-  { href: '/', label: 'Tổng quan', icon: LayoutDashboard },
-  { href: '/projects', label: 'Dự án', icon: FolderOpen },
-]
-
 export default function Sidebar({ profile }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const isAdmin = profile?.role === 'admin'
+
+  const navItems = [
+    { href: '/', label: 'Tổng quan', icon: LayoutDashboard },
+    { href: '/projects', label: 'Dự án', icon: FolderOpen },
+    ...(isAdmin ? [{ href: '/settings', label: 'Cài đặt', icon: Settings }] : []),
+  ]
 
   async function handleLogout() {
     const supabase = createClient()

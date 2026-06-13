@@ -45,14 +45,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const isAdmin = (profile as Profile | null)?.role === 'admin'
 
-  const totalNccReceived = nccItems?.reduce((s, c) => s + (c.received_amount || 0), 0) || 0
-  const totalPlanned =
-    (ntpExpenses?.reduce((s, e) => s + (e.planned_amount || 0), 0) || 0) +
-    (otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0)
-  const totalSpent =
-    (ntpExpenses?.reduce((s, e) => s + (e.actual_amount || 0), 0) || 0) +
-    (otherCommitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0)
-  const balance = totalNccReceived - totalSpent
+  // Calculate quick stats using new formulas
+  const totalNccContract = nccItems?.reduce((s, c) => s + (c.contract_amount || 0), 0) || 0
+  const totalNtpAll = ntpExpenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0
+  const totalCustomerCosts = customerCosts?.reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const controlNcc = totalNccContract - totalNtpAll
+  const controlKH = (plSummary?.kh_budget || 0) - totalCustomerCosts
+  const totalManage = controlNcc + controlKH
 
   return (
     <div className="p-6 space-y-6">
@@ -75,28 +74,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-green-700 font-medium">Tiền nhận từ NCC</p>
-            <p className="text-lg font-bold text-green-700">{formatVND(totalNccReceived)}</p>
-          </CardContent>
-        </Card>
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-orange-700 font-medium">Chi kế hoạch</p>
-            <p className="text-lg font-bold text-orange-700">{formatVND(totalPlanned)}</p>
+            <p className="text-xs text-orange-700 font-medium">Tổng HĐ NCC</p>
+            <p className="text-lg font-bold text-orange-700">{formatVND(totalNccContract)}</p>
           </CardContent>
         </Card>
-        <Card className="border-red-200 bg-red-50">
+        <Card className={controlNcc >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-red-700 font-medium">Đã chi</p>
-            <p className="text-lg font-bold text-red-700">{formatVND(totalSpent)}</p>
+            <p className={`text-xs font-medium ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Control NCC</p>
+            <p className={`text-lg font-bold ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(controlNcc)}</p>
           </CardContent>
         </Card>
-        <Card className={balance >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
+        <Card className={controlKH >= 0 ? 'border-purple-200 bg-purple-50' : 'border-red-200 bg-red-50'}>
           <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${balance >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Số dư</p>
-            <p className={`text-lg font-bold ${balance >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(balance)}</p>
+            <p className={`text-xs font-medium ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>Control KH</p>
+            <p className={`text-lg font-bold ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>{formatVND(controlKH)}</p>
+          </CardContent>
+        </Card>
+        <Card className={totalManage >= 0 ? 'border-blue-300 bg-blue-100' : 'border-red-200 bg-red-50'}>
+          <CardContent className="pt-4 pb-3">
+            <p className={`text-xs font-medium ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>Tổng Manage</p>
+            <p className={`text-lg font-bold ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(totalManage)}</p>
           </CardContent>
         </Card>
       </div>
@@ -130,6 +129,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             customerCosts={customerCosts || []}
             isAdmin={isAdmin}
             contractValue={plSummary?.contract_value || 0}
+            khBudget={plSummary?.kh_budget || 0}
           />
         </TabsContent>
 

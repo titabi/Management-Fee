@@ -18,25 +18,23 @@ interface Props {
   customerCosts: CustomerCost[]
 }
 
-export default function TongQuan({ project, nccItems, ntpExpenses, otherCommitments, plSummary, isAdmin, customerCosts }: Props) {
-  const totalNccReceived = nccItems.reduce((s, c) => s + (c.received_amount || 0), 0)
+export default function TongQuan({ nccItems, ntpExpenses, otherCommitments, plSummary, isAdmin, customerCosts }: Props) {
   const totalNccContract = nccItems.reduce((s, c) => s + (c.contract_amount || 0), 0)
-  const totalExpensesActual = ntpExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0)
-  const totalExpensesPlanned = ntpExpenses.reduce((s, e) => s + (e.planned_amount || 0), 0)
+  const totalNccReceived = nccItems.reduce((s, c) => s + (c.received_amount || 0), 0)
+  // Use amount field for ntp_expenses (redesign)
+  const totalNtpAll = ntpExpenses.reduce((s, e) => s + (e.amount || 0), 0)
+  const totalNtpPlanned = ntpExpenses.filter(e => e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
+  const totalNtpCompleted = ntpExpenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
   const totalCommitmentsAmount = otherCommitments.reduce((s, c) => s + (c.amount || 0), 0)
   const totalCommitmentsPaid = otherCommitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
+
   // Chi phí KH
-  const khConLai = customerCosts.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
-  const khDaChi = customerCosts.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
-  const totalCustomerCosts = khConLai + khDaChi
-  // NCC còn lại = tổng HĐ NCC - tổng chi NTP thực tế
-  const nccConLai = totalNccContract - totalExpensesActual
-  const nccDaChi = totalExpensesActual
-  // Tổng cần Manage = KH còn lại + NCC còn lại
-  const totalCanManage = khConLai + Math.max(0, nccConLai)
-  const totalSpent = totalExpensesActual + totalCommitmentsPaid + khDaChi
-  const balance = totalNccReceived - totalSpent
-  const totalPlanned = totalExpensesPlanned + totalCommitmentsAmount + totalCustomerCosts
+  const totalCustomerCosts = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
+
+  // New formulas
+  const controlNcc = totalNccContract - totalNtpAll
+  const controlKH = (plSummary?.kh_budget || 0) - totalCustomerCosts
+  const totalManage = controlNcc + controlKH
 
   return (
     <div className="space-y-4 mt-4">
@@ -70,15 +68,15 @@ export default function TongQuan({ project, nccItems, ntpExpenses, otherCommitme
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Chi tiêu kế hoạch</span>
-              <span className="font-medium text-orange-600">{formatVND(totalExpensesPlanned)}</span>
+              <span className="font-medium text-yellow-600">{formatVND(totalNtpPlanned)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Chi tiêu thực tế</span>
-              <span className="font-medium text-red-600">{formatVND(totalExpensesActual)}</span>
+              <span className="font-medium text-red-600">{formatVND(totalNtpCompleted)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Số mục chi tiêu</span>
-              <span className="font-medium">{ntpExpenses.length}</span>
+              <span className="text-gray-600">Tổng cộng</span>
+              <span className="font-medium text-orange-600">{formatVND(totalNtpAll)}</span>
             </div>
           </CardContent>
         </Card>
@@ -120,8 +118,12 @@ export default function TongQuan({ project, nccItems, ntpExpenses, otherCommitme
                 {formatVND(plSummary?.p11_profit || 0)}
               </span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">KH Budget</span>
+              <span className="font-medium text-purple-600">{formatVND(plSummary?.kh_budget || 0)}</span>
+            </div>
             <div className="flex justify-between text-sm border-t pt-2">
-              <span className="text-gray-700 font-semibold">Trạng thái dữ liệu</span>
+              <span className="text-gray-700 font-semibold">Trạng thái</span>
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${plSummary ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                 {plSummary ? 'Đã cập nhật' : 'Chưa có dữ liệu'}
               </span>
@@ -130,67 +132,47 @@ export default function TongQuan({ project, nccItems, ntpExpenses, otherCommitme
         </Card>
       </div>
 
-      {/* Bottom line */}
-      <Card className={`border-2 ${balance >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Tổng tiền nhận từ NCC</p>
-              <p className="text-xl font-bold text-green-600">{formatVND(totalNccReceived)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Tổng đã chi</p>
-              <p className="text-xl font-bold text-red-600">{formatVND(totalSpent)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Số dư</p>
-              <p className={`text-xl font-bold ${balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatVND(balance)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {isAdmin && (
         <Card className="border-blue-300 bg-blue-50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-blue-700">💼 Tổng tiền cần Manage</CardTitle>
+            <CardTitle className="text-sm font-semibold text-blue-700">Tổng tiền cần Manage</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-purple-700 uppercase">Chi phí KH</p>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Kế hoạch (còn lại)</span>
-                  <span className="font-medium text-yellow-700">{formatVND(khConLai)}</span>
+                  <span className="text-gray-600">KH Budget</span>
+                  <span className="font-medium text-purple-700">{formatVND(plSummary?.kh_budget || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Đã chi</span>
-                  <span className="font-medium text-green-700">{formatVND(khDaChi)}</span>
+                  <span className="text-gray-600">Tổng chi phí</span>
+                  <span className="font-medium text-red-600">{formatVND(totalCustomerCosts)}</span>
                 </div>
                 <div className="flex justify-between text-sm border-t pt-1">
-                  <span className="font-semibold">Tổng KH</span>
-                  <span className="font-bold">{formatVND(totalCustomerCosts)}</span>
+                  <span className="font-semibold">Tiền control KH</span>
+                  <span className={`font-bold ${controlKH >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlKH)}</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-orange-700 uppercase">NCC / NTP</p>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Còn lại (HĐ - Chi)</span>
-                  <span className={`font-medium ${nccConLai >= 0 ? 'text-orange-700' : 'text-red-600'}`}>{formatVND(Math.max(0, nccConLai))}</span>
+                  <span className="text-gray-600">Tổng HĐ NCC</span>
+                  <span className="font-medium text-orange-700">{formatVND(totalNccContract)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Đã chi (NTP)</span>
-                  <span className="font-medium text-red-600">{formatVND(nccDaChi)}</span>
+                  <span className="text-gray-600">Tổng chi NTP</span>
+                  <span className="font-medium text-red-600">{formatVND(totalNtpAll)}</span>
                 </div>
                 <div className="flex justify-between text-sm border-t pt-1">
-                  <span className="font-semibold">Tổng HĐ NCC</span>
-                  <span className="font-bold">{formatVND(totalNccContract)}</span>
+                  <span className="font-semibold">Tiền control NCC</span>
+                  <span className={`font-bold ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlNcc)}</span>
                 </div>
               </div>
               <div className="bg-blue-100 rounded-lg p-3 flex flex-col justify-center items-center text-center">
                 <p className="text-xs text-blue-600 mb-1">Tổng cần Manage</p>
-                <p className="text-2xl font-bold text-blue-800">{formatVND(totalCanManage)}</p>
-                <p className="text-xs text-blue-500 mt-1">KH còn lại + NCC còn lại</p>
+                <p className="text-2xl font-bold text-blue-800">{formatVND(totalManage)}</p>
+                <p className="text-xs text-blue-500 mt-1">Control KH + Control NCC</p>
               </div>
             </div>
           </CardContent>

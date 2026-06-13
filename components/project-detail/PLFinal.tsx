@@ -3,16 +3,18 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatVND } from '@/lib/utils/format'
+import { formatVND, formatDate } from '@/lib/utils/format'
 import { PLSummary, NCCItem, CustomerCost, NtpExpense } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Upload, Save, FileSpreadsheet, PenLine, Plus, Trash2 } from 'lucide-react'
+import { AmountInput } from '@/components/ui/amount-input'
+import { Upload, Save, FileSpreadsheet, PenLine, Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
@@ -25,15 +27,14 @@ interface Props {
   isAdmin: boolean
 }
 
-interface NccRow { id?: string; name: string; contract_amount: string; received_amount: string; status: string; note: string }
-interface KhRow  { id?: string; description: string; amount: string; category: string; note: string }
-
 type InputMode = 'manual' | 'excel'
 
 function pct(amount: number, base: number) {
   if (!base || !amount) return null
   return ((amount / base) * 100).toFixed(1) + '%'
 }
+
+const CATEGORIES_KH = ['Phí dịch vụ', 'Vật tư', 'Nhân công', 'Thiết bị', 'Vận chuyển', 'Khác']
 
 export default function PLFinal({ projectId, plSummary, nccItems, customerCosts, ntpExpenses, isAdmin }: Props) {
   const router = useRouter()
@@ -44,49 +45,36 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
   // Main P/L fields
   const [contractValue, setContractValue] = useState(String(plSummary?.contract_value || ''))
   const [p11Profit, setP11Profit] = useState(String(plSummary?.p11_profit || ''))
+  const [nccBudget, setNccBudget] = useState(String(plSummary?.ncc_budget || ''))
+  const [khBudget, setKhBudget] = useState(String(plSummary?.kh_budget || ''))
   const [note, setNote] = useState(plSummary?.note || '')
   const [excelFileName, setExcelFileName] = useState(plSummary?.excel_file_name || '')
   const [excelSheets, setExcelSheets] = useState<Record<string, (string | number)[][]> | null>(null)
 
-  // NCC rows in form
-  const [nccRows, setNccRows] = useState<NccRow[]>(
-    nccItems.length > 0
-      ? nccItems.map(n => ({ id: n.id, name: n.name, contract_amount: String(n.contract_amount), received_amount: String(n.received_amount), status: n.status, note: n.note || '' }))
-      : [{ name: '', contract_amount: '', received_amount: '', status: 'pending', note: '' }]
-  )
+  // NCC dialog state
+  const [nccDialogOpen, setNccDialogOpen] = useState(false)
+  const [editNccId, setEditNccId] = useState<string | null>(null)
+  const [nccForm, setNccForm] = useState({ name: '', contract_amount: '', received_amount: '', status: 'pending', note: '' })
 
-  // Chi phí KH rows in form
-  const [khRows, setKhRows] = useState<KhRow[]>(
-    customerCosts.length > 0
-      ? customerCosts.map(c => ({ id: c.id, description: c.description, amount: String(c.amount), category: c.category, note: c.note || '' }))
-      : [{ description: '', amount: '', category: 'Phí dịch vụ', note: '' }]
-  )
+  // KH dialog state
+  const [khDialogOpen, setKhDialogOpen] = useState(false)
+  const [editKhId, setEditKhId] = useState<string | null>(null)
+  const [khForm, setKhForm] = useState({ description: '', amount: '', category: 'Phí dịch vụ', date: new Date().toISOString().split('T')[0], status: 'planned', note: '', customer_name: '' })
 
   const cvNum = parseInt(contractValue.replace(/\D/g, ''), 10) || 0
 
-  const totalCustomerCosts = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
-  const totalNccContract = nccItems.reduce((s, n) => s + (n.contract_amount || 0), 0)
-  const totalNtpActual = ntpExpenses.reduce((s, e) => s + (e.actual_amount || 0), 0)
-
   function getNtpTotalForNcc(nccId: string) {
-    return ntpExpenses.filter(e => e.ncc_item_id === nccId).reduce((s, e) => s + (e.actual_amount || 0), 0)
+    return ntpExpenses.filter(e => e.ncc_item_id === nccId).reduce((s, e) => s + (e.amount || 0), 0)
   }
 
-  // ─── NCC row handlers ───
-  function addNccRow() { setNccRows(r => [...r, { name: '', contract_amount: '', received_amount: '', status: 'pending', note: '' }]) }
-  function removeNccRow(i: number) { setNccRows(r => r.filter((_, idx) => idx !== i)) }
-  function updateNccRow(i: number, field: keyof NccRow, val: string) {
-    setNccRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
-  }
+  const totalNccContract = nccItems.reduce((s, n) => s + (n.contract_amount || 0), 0)
+  const totalNtpAll = ntpExpenses.reduce((s, e) => s + (e.amount || 0), 0)
+  const totalCustomerCosts = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
+  const controlNcc = totalNccContract - totalNtpAll
+  const controlKH = (plSummary?.kh_budget || 0) - totalCustomerCosts
+  const totalManage = controlKH + controlNcc
 
-  // ─── KH row handlers ───
-  function addKhRow() { setKhRows(r => [...r, { description: '', amount: '', category: 'Phí dịch vụ', note: '' }]) }
-  function removeKhRow(i: number) { setKhRows(r => r.filter((_, idx) => idx !== i)) }
-  function updateKhRow(i: number, field: keyof KhRow, val: string) {
-    setKhRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
-  }
-
-  // ─── Excel upload ───
+  // Excel upload
   async function handleFileUpload(evt: React.ChangeEvent<HTMLInputElement>) {
     const file = evt.target.files?.[0]
     if (!file) return
@@ -120,69 +108,101 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  // ─── Save all ───
+  // Save pl_summary only
   async function handleSave() {
     setLoading(true)
     const supabase = createClient()
-
-    // 1. Upsert pl_summary
     const plPayload = {
       project_id: projectId,
       contract_value: parseInt(contractValue.replace(/\D/g, ''), 10) || 0,
       p11_profit: parseInt(p11Profit.replace(/\D/g, ''), 10) || 0,
+      ncc_budget: parseInt(nccBudget.replace(/\D/g, ''), 10) || 0,
+      kh_budget: parseInt(khBudget.replace(/\D/g, ''), 10) || 0,
       note: note || null,
       excel_file_name: excelFileName || null,
       updated_at: new Date().toISOString(),
     }
-    const plRes = plSummary
+    const res = plSummary
       ? await supabase.from('pl_summary').update(plPayload).eq('id', plSummary.id)
       : await supabase.from('pl_summary').insert(plPayload)
-    if (plRes.error) { toast.error('Lỗi lưu P/L: ' + plRes.error.message); setLoading(false); return }
-
-    // 2. Upsert NCC rows (only rows with a name)
-    const validNcc = nccRows.filter(r => r.name.trim())
-    for (const row of validNcc) {
-      const nccPayload = {
-        project_id: projectId,
-        name: row.name.trim(),
-        contract_amount: parseInt(row.contract_amount.replace(/\D/g, ''), 10) || 0,
-        received_amount: parseInt(row.received_amount.replace(/\D/g, ''), 10) || 0,
-        status: row.status,
-        note: row.note || null,
-      }
-      if (row.id) {
-        await supabase.from('ncc_items').update(nccPayload).eq('id', row.id)
-      } else {
-        await supabase.from('ncc_items').insert(nccPayload)
-      }
-    }
-
-    // 3. Upsert Chi phí KH rows (only rows with description)
-    const validKh = khRows.filter(r => r.description.trim())
-    for (const row of validKh) {
-      const khPayload = {
-        project_id: projectId,
-        description: row.description.trim(),
-        amount: parseInt(row.amount.replace(/\D/g, ''), 10) || 0,
-        category: row.category || 'Phí dịch vụ',
-        note: row.note || null,
-        date: new Date().toISOString().split('T')[0],
-      }
-      if (row.id) {
-        await supabase.from('customer_costs').update(khPayload).eq('id', row.id)
-      } else {
-        await supabase.from('customer_costs').insert(khPayload)
-      }
-    }
-
-    toast.success('Đã lưu P/L Final + NCC + Chi phí KH!')
-    router.refresh()
+    if (res.error) toast.error('Lỗi lưu P/L: ' + res.error.message)
+    else { toast.success('Đã lưu P/L Final!'); router.refresh() }
     setLoading(false)
+  }
+
+  // NCC CRUD
+  function openAddNcc() { setEditNccId(null); setNccForm({ name: '', contract_amount: '', received_amount: '', status: 'pending', note: '' }); setNccDialogOpen(true) }
+  function openEditNcc(item: NCCItem) {
+    setEditNccId(item.id)
+    setNccForm({ name: item.name, contract_amount: String(item.contract_amount), received_amount: String(item.received_amount), status: item.status, note: item.note || '' })
+    setNccDialogOpen(true)
+  }
+  async function handleNccSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    const supabase = createClient()
+    const payload = {
+      project_id: projectId,
+      name: nccForm.name,
+      contract_amount: parseInt(nccForm.contract_amount.replace(/\D/g, ''), 10) || 0,
+      received_amount: parseInt(nccForm.received_amount.replace(/\D/g, ''), 10) || 0,
+      status: nccForm.status,
+      note: nccForm.note || null,
+    }
+    const res = editNccId
+      ? await supabase.from('ncc_items').update(payload).eq('id', editNccId)
+      : await supabase.from('ncc_items').insert(payload)
+    if (res.error) toast.error('Lỗi: ' + res.error.message)
+    else { toast.success(editNccId ? 'Đã cập nhật NCC!' : 'Thêm NCC thành công!'); setNccDialogOpen(false); router.refresh() }
+    setLoading(false)
+  }
+  async function handleDeleteNcc(id: string) {
+    if (!confirm('Xóa NCC này?')) return
+    const supabase = createClient()
+    const { error } = await supabase.from('ncc_items').delete().eq('id', id)
+    if (error) toast.error('Lỗi: ' + error.message)
+    else { toast.success('Đã xóa!'); router.refresh() }
+  }
+
+  // KH CRUD
+  function openAddKh() { setEditKhId(null); setKhForm({ description: '', amount: '', category: 'Phí dịch vụ', date: new Date().toISOString().split('T')[0], status: 'planned', note: '', customer_name: '' }); setKhDialogOpen(true) }
+  function openEditKh(c: CustomerCost) {
+    setEditKhId(c.id)
+    setKhForm({ description: c.description, amount: String(c.amount), category: c.category, date: c.date, status: c.status, note: c.note || '', customer_name: c.customer_name || '' })
+    setKhDialogOpen(true)
+  }
+  async function handleKhSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    const supabase = createClient()
+    const payload = {
+      project_id: projectId,
+      description: khForm.description,
+      amount: parseInt(khForm.amount.replace(/\D/g, ''), 10) || 0,
+      category: khForm.category,
+      date: khForm.date,
+      status: khForm.status,
+      note: khForm.note || null,
+      customer_name: khForm.customer_name || null,
+    }
+    const res = editKhId
+      ? await supabase.from('customer_costs').update(payload).eq('id', editKhId)
+      : await supabase.from('customer_costs').insert(payload)
+    if (res.error) toast.error('Lỗi: ' + res.error.message)
+    else { toast.success(editKhId ? 'Đã cập nhật!' : 'Thêm thành công!'); setKhDialogOpen(false); router.refresh() }
+    setLoading(false)
+  }
+  async function handleDeleteKh(id: string) {
+    if (!confirm('Xóa chi phí này?')) return
+    const supabase = createClient()
+    const { error } = await supabase.from('customer_costs').delete().eq('id', id)
+    if (error) toast.error('Lỗi: ' + error.message)
+    else { toast.success('Đã xóa!'); router.refresh() }
   }
 
   return (
     <div className="mt-4 space-y-4">
-      {/* ── Input Section ── */}
+      {/* Input Section */}
       {isAdmin && (
         <Card>
           <CardHeader className="pb-3">
@@ -199,7 +219,6 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Excel upload */}
             {inputMode === 'excel' && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -235,146 +254,12 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
               </div>
             )}
 
-            {/* ── Giá trị HĐ & P11 ── */}
+            {/* Main fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Giá trị HĐ trước VAT (VND)</Label>
-                <Input type="number" value={contractValue} onChange={e => setContractValue(e.target.value)} placeholder="0" />
-                {cvNum > 0 && <p className="text-xs text-blue-500">{formatVND(cvNum)} — 100%</p>}
-              </div>
-              <div className="space-y-1">
-                <Label>Lợi nhuận P11 (VND)</Label>
-                <div className="flex items-center gap-2">
-                  <Input type="number" value={p11Profit} onChange={e => setP11Profit(e.target.value)} placeholder="0" />
-                  {cvNum > 0 && parseInt(p11Profit) > 0 && (
-                    <Badge variant="outline" className="whitespace-nowrap text-green-700 border-green-300">
-                      {pct(parseInt(p11Profit), cvNum)}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ── NCC / NTP section ── */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold text-orange-700">🏗️ NCC / Nhà Thầu Phụ</Label>
-                <Button size="sm" variant="outline" onClick={addNccRow}>
-                  <Plus className="h-3 w-3 mr-1" /> Thêm NCC
-                </Button>
-              </div>
-              <div className="space-y-2 rounded-md border p-3 bg-orange-50">
-                {nccRows.map((row, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4 space-y-1">
-                      {i === 0 && <Label className="text-xs">Tên NCC</Label>}
-                      <Input
-                        placeholder="Tên nhà thầu phụ"
-                        value={row.name}
-                        onChange={e => updateNccRow(i, 'name', e.target.value)}
-                        className="text-sm h-8"
-                      />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      {i === 0 && <Label className="text-xs">Giá trị HĐ (VND)</Label>}
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={row.contract_amount}
-                          onChange={e => updateNccRow(i, 'contract_amount', e.target.value)}
-                          className="text-sm h-8"
-                        />
-                        {cvNum > 0 && parseInt(row.contract_amount) > 0 && (
-                          <span className="absolute -bottom-4 left-0 text-xs text-orange-600">
-                            {pct(parseInt(row.contract_amount), cvNum)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      {i === 0 && <Label className="text-xs">Đã nhận (VND)</Label>}
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={row.received_amount}
-                        onChange={e => updateNccRow(i, 'received_amount', e.target.value)}
-                        className="text-sm h-8"
-                      />
-                    </div>
-                    <div className="col-span-1 space-y-1">
-                      {i === 0 && <Label className="text-xs">&nbsp;</Label>}
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-600" onClick={() => removeNccRow(i)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {nccRows.some(r => cvNum > 0 && parseInt(r.contract_amount) > 0) && (
-                  <p className="text-xs text-gray-400 mt-3">* % tính trên giá trị HĐ trước VAT</p>
-                )}
-              </div>
-            </div>
-
-            {/* ── Chi phí KH section ── */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold text-purple-700">👥 Chi phí Khách Hàng</Label>
-                <Button size="sm" variant="outline" onClick={addKhRow}>
-                  <Plus className="h-3 w-3 mr-1" /> Thêm mục
-                </Button>
-              </div>
-              <div className="space-y-2 rounded-md border p-3 bg-purple-50">
-                {khRows.map((row, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-5 space-y-1">
-                      {i === 0 && <Label className="text-xs">Mô tả</Label>}
-                      <Input
-                        placeholder="Tên chi phí..."
-                        value={row.description}
-                        onChange={e => updateKhRow(i, 'description', e.target.value)}
-                        className="text-sm h-8"
-                      />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      {i === 0 && <Label className="text-xs">Danh mục</Label>}
-                      <select
-                        className="w-full border rounded-md text-sm h-8 px-2 bg-white"
-                        value={row.category}
-                        onChange={e => updateKhRow(i, 'category', e.target.value)}
-                      >
-                        <option>Phí dịch vụ</option>
-                        <option>Vật tư</option>
-                        <option>Nhân công</option>
-                        <option>Khác</option>
-                      </select>
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      {i === 0 && <Label className="text-xs">Số tiền (VND)</Label>}
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={row.amount}
-                          onChange={e => updateKhRow(i, 'amount', e.target.value)}
-                          className="text-sm h-8"
-                        />
-                        {cvNum > 0 && parseInt(row.amount) > 0 && (
-                          <span className="absolute -bottom-4 left-0 text-xs text-purple-600">
-                            {pct(parseInt(row.amount), cvNum)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="col-span-1">
-                      {i === 0 && <Label className="text-xs">&nbsp;</Label>}
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-600" onClick={() => removeKhRow(i)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <AmountInput label="Giá trị HĐ trước VAT" value={contractValue} onChange={setContractValue} />
+              <AmountInput label="Lợi nhuận P11" value={p11Profit} onChange={setP11Profit} contractValue={cvNum} />
+              <AmountInput label="Chi phí NCC/NTP (P/L Budget)" value={nccBudget} onChange={setNccBudget} contractValue={cvNum} />
+              <AmountInput label="Chi phí Khách Hàng (KH Budget)" value={khBudget} onChange={setKhBudget} contractValue={cvNum} />
             </div>
 
             <div className="space-y-2">
@@ -384,87 +269,49 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
 
             <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto">
               <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Đang lưu...' : 'Lưu tất cả (P/L + NCC + Chi phí KH)'}
+              {loading ? 'Đang lưu...' : 'Lưu P/L Final'}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-blue-700 font-medium mb-1">💰 Giá trị HĐ trước VAT</p>
-            <p className="text-xl font-bold text-blue-800">{formatVND(plSummary?.contract_value || 0)}</p>
-            <p className="text-xs text-blue-500 mt-1">= 100% giá bán</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-2 ${(plSummary?.p11_profit || 0) >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs font-medium mb-1 text-gray-600">📈 Lợi nhuận P11</p>
-            <p className={`text-xl font-bold ${(plSummary?.p11_profit || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-              {formatVND(plSummary?.p11_profit || 0)}
-            </p>
-            {plSummary?.contract_value ? (
-              <p className="text-xs text-gray-500 mt-1">{pct(plSummary.p11_profit, plSummary.contract_value)} trên giá bán</p>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-purple-700 font-medium">👥 Chi phí Khách Hàng</p>
-              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Tự động</Badge>
-            </div>
-            <p className="text-xl font-bold text-purple-800">{formatVND(totalCustomerCosts)}</p>
-            {plSummary?.contract_value ? (
-              <p className="text-xs text-purple-500 mt-1">{pct(totalCustomerCosts, plSummary.contract_value)} trên giá bán</p>
-            ) : <p className="text-xs text-purple-500 mt-1">{customerCosts.length} mục</p>}
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-orange-700 font-medium">🏗️ Chi phí NCC</p>
-              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Tự động</Badge>
-            </div>
-            <p className="text-xl font-bold text-orange-800">{formatVND(totalNccContract)}</p>
-            {plSummary?.contract_value ? (
-              <p className="text-xs text-orange-500 mt-1">{pct(totalNccContract, plSummary.contract_value)} trên giá bán</p>
-            ) : <p className="text-xs text-orange-500 mt-1">{nccItems.length} NCC</p>}
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-red-700 font-medium">💵 Tổng chi NTP thực tế</p>
-              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Tự động</Badge>
-            </div>
-            <p className="text-xl font-bold text-red-800">{formatVND(totalNtpActual)}</p>
-            {plSummary?.contract_value ? (
-              <p className="text-xs text-red-500 mt-1">{pct(totalNtpActual, plSummary.contract_value)} trên giá bán</p>
-            ) : <p className="text-xs text-red-500 mt-1">{ntpExpenses.length} mục</p>}
-          </CardContent>
-        </Card>
+      {/* Summary Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        {[
+          { label: 'Giá trị HĐ', value: plSummary?.contract_value || 0, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+          { label: 'Lợi nhuận P11', value: plSummary?.p11_profit || 0, color: (plSummary?.p11_profit || 0) >= 0 ? 'text-green-700' : 'text-red-700', bg: (plSummary?.p11_profit || 0) >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200' },
+          { label: 'CP NCC (Budget)', value: plSummary?.ncc_budget || 0, color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+          { label: 'CP KH (Budget)', value: plSummary?.kh_budget || 0, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+          { label: 'Control NCC', value: controlNcc, color: controlNcc >= 0 ? 'text-blue-700' : 'text-red-700', bg: controlNcc >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200' },
+          { label: 'Control KH', value: controlKH, color: controlKH >= 0 ? 'text-blue-700' : 'text-red-700', bg: controlKH >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200' },
+          { label: 'Tổng Manage', value: totalManage, color: totalManage >= 0 ? 'text-blue-800' : 'text-red-700', bg: 'bg-blue-100 border-blue-300' },
+        ].map((item, i) => (
+          <Card key={i} className={`border ${item.bg}`}>
+            <CardContent className="pt-3 pb-2">
+              <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+              <p className={`text-sm font-bold ${item.color}`}>{formatVND(item.value)}</p>
+              {plSummary?.contract_value && item.value !== 0 ? (
+                <p className="text-xs text-gray-400 mt-0.5">{pct(Math.abs(item.value), plSummary.contract_value)}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {!isAdmin && plSummary?.note && (
-        <div className="p-3 bg-gray-50 rounded border text-sm text-gray-600">
-          <span className="font-medium">Ghi chú: </span>{plSummary.note}
-        </div>
-      )}
-
-      {/* ── NCC Summary Table ── */}
+      {/* NCC Section */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Bảng tổng hợp NCC / Nhà Thầu Phụ</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-sm font-semibold text-orange-700">NCC / Nhà Thầu Phụ</CardTitle>
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={openAddNcc}>
+              <Plus className="h-3 w-3 mr-1" /> Thêm NCC
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {nccItems.length > 0 ? (
+          {nccItems.length === 0 ? (
+            <p className="text-center py-4 text-gray-400 text-sm">Chưa có NCC nào</p>
+          ) : (
             <>
               <div className="overflow-x-auto">
                 <Table>
@@ -472,57 +319,219 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
                     <TableRow>
                       <TableHead>Tên NCC</TableHead>
                       <TableHead className="text-right">Giá trị HĐ</TableHead>
-                      <TableHead className="text-right">% giá bán</TableHead>
-                      <TableHead className="text-right">Tổng chi NTP</TableHead>
-                      <TableHead className="text-right">Chênh lệch</TableHead>
-                      <TableHead>Trạng thái</TableHead>
+                      <TableHead className="text-right">Tiền đã chi</TableHead>
+                      <TableHead className="text-right">Tiền KH</TableHead>
+                      <TableHead className="text-right">Tiền control</TableHead>
+                      <TableHead className="text-right">%</TableHead>
+                      {isAdmin && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {nccItems.map(ncc => {
                       const ntpTotal = getNtpTotalForNcc(ncc.id)
-                      const diff = ncc.contract_amount - ntpTotal
-                      const statusLabels: Record<string, string> = { pending: 'Chờ xử lý', active: 'Đang TH', completed: 'Hoàn thành' }
-                      const statusColors: Record<string, string> = { pending: 'bg-yellow-100 text-yellow-700', active: 'bg-blue-100 text-blue-700', completed: 'bg-green-100 text-green-700' }
+                      const ntpPlanned = ntpExpenses.filter(e => e.ncc_item_id === ncc.id && e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
+                      const control = ncc.contract_amount - ntpTotal
                       return (
                         <TableRow key={ncc.id}>
-                          <TableCell className="font-medium">{ncc.name}</TableCell>
-                          <TableCell className="text-right">{formatVND(ncc.contract_amount)}</TableCell>
-                          <TableCell className="text-right text-orange-600 font-medium">
-                            {plSummary?.contract_value ? pct(ncc.contract_amount, plSummary.contract_value) : '—'}
+                          <TableCell className="font-medium">
+                            {ncc.name}
+                            {ncc.note && <p className="text-xs text-gray-400 italic">{ncc.note}</p>}
                           </TableCell>
-                          <TableCell className="text-right text-red-600">{formatVND(ntpTotal)}</TableCell>
-                          <TableCell className={`text-right font-semibold ${diff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatVND(diff)}
+                          <TableCell className="text-right font-semibold">{formatVND(ncc.contract_amount)}</TableCell>
+                          <TableCell className="text-right text-red-600">{formatVND(ntpTotal - ntpPlanned)}</TableCell>
+                          <TableCell className="text-right text-yellow-600">{formatVND(ntpPlanned)}</TableCell>
+                          <TableCell className={`text-right font-bold ${control >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(control)}</TableCell>
+                          <TableCell className="text-right text-xs text-gray-500">
+                            {cvNum ? pct(ncc.contract_amount, cvNum) : '—'}
                           </TableCell>
-                          <TableCell>
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusColors[ncc.status] || ''}`}>
-                              {statusLabels[ncc.status] || ncc.status}
-                            </span>
-                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditNcc(ncc)}><Pencil className="h-3.5 w-3.5 text-blue-500" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteNcc(ncc.id)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       )
                     })}
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex justify-end mt-3 pt-3 border-t gap-6 flex-wrap">
+              <div className="flex justify-end gap-6 mt-3 pt-3 border-t">
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Tổng giá trị HĐ NCC</p>
+                  <p className="text-xs text-gray-500">Tổng HĐ NCC</p>
                   <p className="font-bold text-orange-700">{formatVND(totalNccContract)}</p>
-                  {plSummary?.contract_value && <p className="text-xs text-orange-500">{pct(totalNccContract, plSummary.contract_value)} giá bán</p>}
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500">Tổng chi NTP</p>
-                  <p className="font-bold text-red-600">{formatVND(nccItems.reduce((s, n) => s + getNtpTotalForNcc(n.id), 0))}</p>
+                  <p className="font-bold text-red-600">{formatVND(totalNtpAll)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Tiền control NCC</p>
+                  <p className={`font-bold ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlNcc)}</p>
                 </div>
               </div>
             </>
-          ) : (
-            <p className="text-center py-8 text-gray-500">Chưa có NCC nào. Thêm NCC ở phần nhập liệu bên trên hoặc tab NCC / NTP.</p>
           )}
         </CardContent>
       </Card>
+
+      {/* Chi phí KH Section */}
+      {isAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-sm font-semibold text-purple-700">Chi phí Khách Hàng</CardTitle>
+              <p className="text-xs text-gray-500 mt-0.5">KH Budget: {formatVND(plSummary?.kh_budget || 0)}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={openAddKh}>
+              <Plus className="h-3 w-3 mr-1" /> Thêm mục
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {customerCosts.length === 0 ? (
+              <p className="text-center py-4 text-gray-400 text-sm">Chưa có chi phí nào</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mô tả</TableHead>
+                        <TableHead>Khách hàng</TableHead>
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead className="text-right">Số tiền</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                        <TableHead>Ngày</TableHead>
+                        {isAdmin && <TableHead></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {customerCosts.map(cost => (
+                        <TableRow key={cost.id}>
+                          <TableCell className="font-medium">{cost.description}</TableCell>
+                          <TableCell className="text-sm text-gray-500">{cost.customer_name || '—'}</TableCell>
+                          <TableCell>
+                            {cost.status === 'completed'
+                              ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Đã chi</span>
+                              : <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-medium">Kế hoạch</span>
+                            }
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{formatVND(cost.amount)}</TableCell>
+                          <TableCell className="text-right text-xs text-gray-500">
+                            {cvNum ? pct(cost.amount, cvNum) : '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-500">{formatDate(cost.date)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditKh(cost)}><Pencil className="h-3.5 w-3.5 text-blue-500" /></Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteKh(cost.id)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex justify-end gap-6 mt-3 pt-3 border-t">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Tổng chi phí KH</p>
+                    <p className="font-bold text-purple-700">{formatVND(totalCustomerCosts)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Tiền control KH</p>
+                    <p className={`font-bold ${controlKH >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlKH)}</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* NCC Dialog */}
+      <Dialog open={nccDialogOpen} onOpenChange={setNccDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editNccId ? 'Cập nhật NCC' : 'Thêm NCC'}</DialogTitle></DialogHeader>
+          <form onSubmit={handleNccSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tên NCC *</Label>
+              <Input value={nccForm.name} onChange={e => setNccForm({ ...nccForm, name: e.target.value })} required placeholder="Tên nhà cung cấp" />
+            </div>
+            <AmountInput label="Giá trị HĐ" value={nccForm.contract_amount} onChange={v => setNccForm({ ...nccForm, contract_amount: v })} contractValue={cvNum} />
+            <AmountInput label="Đã thanh toán" value={nccForm.received_amount} onChange={v => setNccForm({ ...nccForm, received_amount: v })} contractValue={cvNum} />
+            <div className="space-y-2">
+              <Label>Trạng thái</Label>
+              <Select value={nccForm.status} onValueChange={v => setNccForm({ ...nccForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Chờ xử lý</SelectItem>
+                  <SelectItem value="active">Đang thực hiện</SelectItem>
+                  <SelectItem value="completed">Hoàn thành</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Ghi chú theo dõi</Label>
+              <Textarea value={nccForm.note} onChange={e => setNccForm({ ...nccForm, note: e.target.value })} rows={2} placeholder="NCC cần theo dõi đặc biệt..." />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setNccDialogOpen(false)}>Hủy</Button>
+              <Button type="submit" className="flex-1" disabled={loading}>{loading ? 'Đang lưu...' : 'Lưu'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* KH Dialog */}
+      <Dialog open={khDialogOpen} onOpenChange={setKhDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editKhId ? 'Cập nhật chi phí KH' : 'Thêm chi phí KH'}</DialogTitle></DialogHeader>
+          <form onSubmit={handleKhSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tên khách hàng (nhóm)</Label>
+              <Input value={khForm.customer_name} onChange={e => setKhForm({ ...khForm, customer_name: e.target.value })} placeholder="Tuỳ chọn" />
+            </div>
+            <div className="space-y-2">
+              <Label>Mô tả *</Label>
+              <Input value={khForm.description} onChange={e => setKhForm({ ...khForm, description: e.target.value })} required placeholder="Tên chi phí..." />
+            </div>
+            <AmountInput label="Số tiền" value={khForm.amount} onChange={v => setKhForm({ ...khForm, amount: v })} contractValue={cvNum} required />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Danh mục</Label>
+                <Select value={khForm.category} onValueChange={v => setKhForm({ ...khForm, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CATEGORIES_KH.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Trạng thái</Label>
+                <Select value={khForm.status} onValueChange={v => setKhForm({ ...khForm, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned">Kế hoạch</SelectItem>
+                    <SelectItem value="completed">Đã chi</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Ngày</Label>
+              <Input type="date" value={khForm.date} onChange={e => setKhForm({ ...khForm, date: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Ghi chú</Label>
+              <Textarea value={khForm.note} onChange={e => setKhForm({ ...khForm, note: e.target.value })} rows={2} />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setKhDialogOpen(false)}>Hủy</Button>
+              <Button type="submit" className="flex-1" disabled={loading}>{loading ? 'Đang lưu...' : 'Lưu'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -18,7 +18,7 @@ import { Plus, Trash2, Pencil, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CATEGORIES = ['Phát sinh', 'Mua vật tư', 'Thuê CTV', 'Thuê thợ', 'Khác']
-const statusLabels: Record<string, string> = { planned: 'Kế hoạch', completed: 'Hoàn thành' }
+const statusLabels: Record<string, string> = { planned: 'Kế hoạch', completed: 'Đã chi' }
 const categoryColors: Record<string, string> = {
   'Phát sinh': 'bg-orange-100 text-orange-700',
   'Mua vật tư': 'bg-blue-100 text-blue-700',
@@ -37,7 +37,7 @@ interface Props {
 
 const emptyForm = {
   ncc_item_id: '', category: 'Phát sinh', description: '',
-  planned_amount: '', actual_amount: '', date: new Date().toISOString().split('T')[0],
+  amount: '', date: new Date().toISOString().split('T')[0],
   status: 'planned' as NtpExpense['status'], note: '',
 }
 
@@ -55,8 +55,7 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
       ncc_item_id: e.ncc_item_id || '',
       category: e.category,
       description: e.description,
-      planned_amount: String(e.planned_amount),
-      actual_amount: String(e.actual_amount),
+      amount: String(e.amount || 0),
       date: e.date,
       status: e.status,
       note: e.note || '',
@@ -66,19 +65,18 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
 
   async function handleSubmit(evt: React.FormEvent) {
     evt.preventDefault()
-    if (!form.ncc_item_id) {
-      toast.error('Vui lòng chọn NCC')
-      return
-    }
+    if (!form.ncc_item_id) { toast.error('Vui lòng chọn NCC'); return }
     setLoading(true)
     const supabase = createClient()
+    const amountVal = parseInt(form.amount.replace(/\D/g, ''), 10) || 0
     const payload = {
       project_id: projectId,
       ncc_item_id: form.ncc_item_id || null,
       category: form.category,
       description: form.description,
-      planned_amount: parseInt(form.planned_amount.replace(/\D/g, ''), 10) || 0,
-      actual_amount: parseInt(form.actual_amount.replace(/\D/g, ''), 10) || 0,
+      amount: amountVal,
+      planned_amount: form.status === 'planned' ? amountVal : 0,
+      actual_amount: form.status === 'completed' ? amountVal : 0,
       date: form.date,
       status: form.status,
       note: form.note || null,
@@ -104,8 +102,9 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
     else { toast.success('Đã xóa!'); router.refresh() }
   }
 
-  const totalPlanned = expenses.reduce((s, e) => s + (e.planned_amount || 0), 0)
-  const totalActual = expenses.reduce((s, e) => s + (e.actual_amount || 0), 0)
+  const totalPlanned = expenses.filter(e => e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
+  const totalActual = expenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
+  const totalAll = totalPlanned + totalActual
 
   function getNccName(nccId: string | null) {
     if (!nccId) return '—'
@@ -133,16 +132,10 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
                       <Label>Thuộc NCC *</Label>
-                      <Select
-                        value={form.ncc_item_id}
-                        onValueChange={v => setForm({ ...form, ncc_item_id: v })}
-                        required
-                      >
+                      <Select value={form.ncc_item_id} onValueChange={v => setForm({ ...form, ncc_item_id: v })} required>
                         <SelectTrigger><SelectValue placeholder="-- Chọn NCC --" /></SelectTrigger>
                         <SelectContent>
-                          {nccItems.map(n => (
-                            <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
-                          ))}
+                          {nccItems.map(n => <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -160,7 +153,7 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="planned">Kế hoạch</SelectItem>
-                            <SelectItem value="completed">Hoàn thành</SelectItem>
+                            <SelectItem value="completed">Đã chi</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -169,8 +162,7 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
                       <Label>Mô tả *</Label>
                       <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required />
                     </div>
-                    <AmountInput label="Chi kế hoạch" value={form.planned_amount} onChange={v => setForm({ ...form, planned_amount: v })} contractValue={contractValue} />
-                    <AmountInput label="Chi thực tế" value={form.actual_amount} onChange={v => setForm({ ...form, actual_amount: v })} contractValue={contractValue} />
+                    <AmountInput label="Số tiền" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} required />
                     <div className="space-y-2">
                       <Label>Ngày</Label>
                       <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
@@ -206,8 +198,7 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
                       <TableHead>NCC</TableHead>
                       <TableHead>Danh mục</TableHead>
                       <TableHead>Mô tả</TableHead>
-                      <TableHead className="text-right">Chi KH</TableHead>
-                      <TableHead className="text-right">Chi TT</TableHead>
+                      <TableHead className="text-right">Số tiền</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Ghi chú</TableHead>
                       {isAdmin && <TableHead></TableHead>}
@@ -224,8 +215,10 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
                           </span>
                         </TableCell>
                         <TableCell className="font-medium">{exp.description}</TableCell>
-                        <TableCell className="text-right text-orange-600">{formatVND(exp.planned_amount)}</TableCell>
-                        <TableCell className="text-right font-semibold text-red-600">{formatVND(exp.actual_amount)}</TableCell>
+                        <TableCell className="text-right font-semibold text-gray-800">
+                          {formatVND(exp.amount || 0)}
+                          {contractValue ? <span className="text-xs text-gray-400 ml-1">({contractValue > 0 ? ((exp.amount || 0) / contractValue * 100).toFixed(1) + '%' : '—'})</span> : null}
+                        </TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-0.5 rounded font-medium ${exp.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                             {statusLabels[exp.status]}
@@ -247,16 +240,16 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, con
               </div>
               <div className="flex justify-end mt-3 pt-3 border-t gap-6">
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Tổng chi kế hoạch</p>
-                  <p className="font-bold text-orange-600">{formatVND(totalPlanned)}</p>
+                  <p className="text-xs text-gray-500">Tổng kế hoạch</p>
+                  <p className="font-bold text-yellow-600">{formatVND(totalPlanned)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Tổng chi thực tế</p>
+                  <p className="text-xs text-gray-500">Tổng đã chi</p>
                   <p className="font-bold text-red-600">{formatVND(totalActual)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Chênh lệch</p>
-                  <p className={`font-bold ${totalPlanned - totalActual >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatVND(totalPlanned - totalActual)}</p>
+                  <p className="text-xs text-gray-500">Tổng cộng</p>
+                  <p className="font-bold text-gray-800">{formatVND(totalAll)}</p>
                 </div>
               </div>
             </>

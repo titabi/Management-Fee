@@ -29,6 +29,7 @@ export interface CustomerCost {
   date: string
   status: 'planned' | 'completed'
   note: string | null
+  customer_name: string | null
   created_at: string
 }
 
@@ -59,6 +60,7 @@ export interface NtpExpense {
   description: string
   planned_amount: number
   actual_amount: number
+  amount: number
   date: string
   status: NtpExpenseStatus
   note: string | null
@@ -70,6 +72,8 @@ export interface PLSummary {
   project_id: string
   contract_value: number
   p11_profit: number
+  kh_budget: number
+  ncc_budget: number
   excel_file_name: string | null
   note: string | null
   updated_at: string

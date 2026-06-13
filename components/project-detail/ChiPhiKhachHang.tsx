@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AmountInput } from '@/components/ui/amount-input'
-import { ShieldX, Plus, Trash2, Pencil } from 'lucide-react'
+import { ShieldX, Plus, Trash2, Pencil, Wallet, TrendingDown, Users, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CATEGORIES = ['Phí dịch vụ', 'Vật tư', 'Nhân công', 'Thiết bị', 'Vận chuyển', 'Khác']
@@ -24,6 +24,7 @@ interface Props {
   customerCosts: CustomerCost[]
   isAdmin: boolean
   contractValue?: number
+  khBudget?: number
 }
 
 const emptyForm = {
@@ -33,9 +34,15 @@ const emptyForm = {
   date: new Date().toISOString().split('T')[0],
   status: 'planned' as 'planned' | 'completed',
   note: '',
+  customer_name: '',
 }
 
-export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, contractValue }: Props) {
+function pct(amount: number, base: number) {
+  if (!base || !amount) return null
+  return ((amount / base) * 100).toFixed(1) + '%'
+}
+
+export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, contractValue, khBudget }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -66,6 +73,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
       date: c.date,
       status: c.status || 'planned',
       note: c.note || '',
+      customer_name: c.customer_name || '',
     })
     setOpen(true)
   }
@@ -82,22 +90,13 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
       date: form.date,
       status: form.status,
       note: form.note || null,
+      customer_name: form.customer_name || null,
     }
-    let error
-    if (editId) {
-      const res = await supabase.from('customer_costs').update(payload).eq('id', editId)
-      error = res.error
-    } else {
-      const res = await supabase.from('customer_costs').insert(payload)
-      error = res.error
-    }
-    if (error) {
-      toast.error('Lỗi: ' + error.message)
-    } else {
-      toast.success(editId ? 'Đã cập nhật!' : 'Thêm thành công!')
-      setOpen(false)
-      router.refresh()
-    }
+    const res = editId
+      ? await supabase.from('customer_costs').update(payload).eq('id', editId)
+      : await supabase.from('customer_costs').insert(payload)
+    if (res.error) toast.error('Lỗi: ' + res.error.message)
+    else { toast.success(editId ? 'Đã cập nhật!' : 'Thêm thành công!'); setOpen(false); router.refresh() }
     setLoading(false)
   }
 
@@ -109,93 +108,158 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
     else { toast.success('Đã xóa!'); router.refresh() }
   }
 
+  const totalAll = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
   const totalPlanned = customerCosts.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
   const totalCompleted = customerCosts.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
-  const total = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
+  const controlKH = (khBudget || 0) - totalAll
+
+  // Group by customer_name
+  const grouped: Record<string, CustomerCost[]> = {}
+  for (const cost of customerCosts) {
+    const key = cost.customer_name || '(Chưa phân nhóm)'
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(cost)
+  }
+  const groupKeys = Object.keys(grouped).sort()
 
   return (
     <div className="mt-4 space-y-4">
+      {/* Mini Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="border-purple-200 bg-purple-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-4 w-4 text-purple-500" />
+              <p className="text-xs text-purple-700 font-medium">KH Budget</p>
+            </div>
+            <p className="text-lg font-bold text-purple-800">{formatVND(khBudget || 0)}</p>
+            {contractValue ? <p className="text-xs text-purple-500 mt-0.5">{pct(khBudget || 0, contractValue)} giá bán</p> : null}
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              <p className="text-xs text-red-700 font-medium">Tổng đã chi</p>
+            </div>
+            <p className="text-lg font-bold text-red-800">{formatVND(totalCompleted)}</p>
+            <p className="text-xs text-red-500 mt-0.5">Kế hoạch: {formatVND(totalPlanned)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="h-4 w-4 text-yellow-600" />
+              <p className="text-xs text-yellow-700 font-medium">Tổng kế hoạch</p>
+            </div>
+            <p className="text-lg font-bold text-yellow-800">{formatVND(totalAll)}</p>
+            <p className="text-xs text-yellow-600 mt-0.5">{customerCosts.length} mục chi phí</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-2 ${controlKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-4 w-4 text-blue-500" />
+              <p className="text-xs text-blue-700 font-medium">Tiền control KH</p>
+            </div>
+            <p className={`text-lg font-bold ${controlKH >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(controlKH)}</p>
+            <p className="text-xs text-blue-500 mt-0.5">KH Budget - Tổng chi phí</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Cost List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Chi phí khách hàng</CardTitle>
+          <CardTitle className="text-base">Chi phí Khách Hàng</CardTitle>
           <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-1" />Thêm</Button>
         </CardHeader>
         <CardContent>
-          {customerCosts.length > 0 ? (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ngày</TableHead>
-                      <TableHead>Mô tả</TableHead>
-                      <TableHead>Danh mục</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead className="text-right">Số tiền</TableHead>
-                      {contractValue ? <TableHead className="text-right">%</TableHead> : null}
-                      <TableHead>Ghi chú</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {customerCosts.map(cost => (
-                      <TableRow key={cost.id}>
-                        <TableCell className="text-sm text-gray-500">{formatDate(cost.date)}</TableCell>
-                        <TableCell className="font-medium">{cost.description}</TableCell>
-                        <TableCell><span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">{cost.category}</span></TableCell>
-                        <TableCell>
-                          {cost.status === 'completed'
-                            ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Đã chi</span>
-                            : <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-medium">Kế hoạch</span>
-                          }
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{formatVND(cost.amount)}</TableCell>
-                        {contractValue ? (
-                          <TableCell className="text-right text-xs text-gray-500">
-                            {contractValue > 0 ? ((cost.amount / contractValue) * 100).toFixed(1) + '%' : '—'}
-                          </TableCell>
-                        ) : null}
-                        <TableCell className="text-sm text-gray-500">{cost.note}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(cost)}>
-                              <Pencil className="h-4 w-4 text-blue-500" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(cost.id)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex justify-end gap-6 mt-3 pt-3 border-t flex-wrap">
-                <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-0.5">Kế hoạch (còn lại)</p>
-                  <p className="font-semibold text-yellow-700">{formatVND(totalPlanned)}</p>
-                  {contractValue ? <p className="text-xs text-gray-400">{((totalPlanned/contractValue)*100).toFixed(1)}%</p> : null}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-0.5">Đã chi</p>
-                  <p className="font-semibold text-green-700">{formatVND(totalCompleted)}</p>
-                  {contractValue ? <p className="text-xs text-gray-400">{((totalCompleted/contractValue)*100).toFixed(1)}%</p> : null}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-0.5">Tổng cộng</p>
-                  <p className="font-bold text-lg">{formatVND(total)}</p>
-                  {contractValue ? <p className="text-xs text-gray-400">{((total/contractValue)*100).toFixed(1)}%</p> : null}
-                </div>
-              </div>
-            </>
-          ) : (
+          {customerCosts.length === 0 ? (
             <p className="text-center py-8 text-gray-500">Chưa có chi phí nào</p>
+          ) : (
+            <div className="space-y-4">
+              {groupKeys.map(groupKey => {
+                const items = grouped[groupKey]
+                const groupTotal = items.reduce((s, c) => s + (c.amount || 0), 0)
+                return (
+                  <div key={groupKey}>
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-sm font-semibold text-gray-700">{groupKey}</span>
+                      <span className="text-sm font-bold text-purple-700">{formatVND(groupTotal)}</span>
+                    </div>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Ngày</TableHead>
+                            <TableHead>Mô tả</TableHead>
+                            <TableHead>Danh mục</TableHead>
+                            <TableHead>Trạng thái</TableHead>
+                            <TableHead className="text-right">Số tiền</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map(cost => (
+                            <TableRow key={cost.id}>
+                              <TableCell className="text-sm text-gray-500">{formatDate(cost.date)}</TableCell>
+                              <TableCell className="font-medium">{cost.description}</TableCell>
+                              <TableCell><span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">{cost.category}</span></TableCell>
+                              <TableCell>
+                                {cost.status === 'completed'
+                                  ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Đã chi</span>
+                                  : <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-medium">Kế hoạch</span>
+                                }
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {formatVND(cost.amount)}
+                                {contractValue ? <span className="text-xs text-gray-400 ml-1">({pct(cost.amount, contractValue)})</span> : null}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => openEdit(cost)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(cost.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {customerCosts.length > 0 && (
+            <div className="flex justify-end gap-6 mt-3 pt-3 border-t flex-wrap">
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-0.5">Kế hoạch</p>
+                <p className="font-semibold text-yellow-700">{formatVND(totalPlanned)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-0.5">Đã chi</p>
+                <p className="font-semibold text-green-700">{formatVND(totalCompleted)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-0.5">Tổng cộng</p>
+                <p className="font-bold text-lg">{formatVND(totalAll)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-0.5">Tiền control KH</p>
+                <p className={`font-bold text-lg ${controlKH >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(controlKH)}</p>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Dialog Add/Edit */}
+      {/* Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -203,16 +267,14 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+              <Label>Tên khách hàng (nhóm)</Label>
+              <Input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder="Tên khách hàng để phân nhóm (tuỳ chọn)" />
+            </div>
+            <div className="space-y-2">
               <Label>Mô tả *</Label>
               <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required placeholder="Tên chi phí..." />
             </div>
-            <AmountInput
-              label="Số tiền"
-              value={form.amount}
-              onChange={v => setForm({ ...form, amount: v })}
-              contractValue={contractValue}
-              required
-            />
+            <AmountInput label="Số tiền" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} required />
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Danh mục</Label>
