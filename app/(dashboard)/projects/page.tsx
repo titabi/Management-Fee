@@ -22,15 +22,15 @@ export default async function ProjectsPage() {
     { data: projects },
     { data: nccItems },
     { data: ntpExpenses },
-    { data: otherCommitments },
     { data: customerCosts },
+    { data: plSummaries },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
-    supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
-    supabase.from('other_commitments').select('project_id, amount, paid_amount'),
+    supabase.from('ncc_items').select('project_id, contract_amount'),
+    supabase.from('ntp_expenses').select('project_id, amount, status'),
     supabase.from('customer_costs').select('project_id, amount, status'),
+    supabase.from('pl_summary').select('project_id, kh_budget'),
   ])
 
   const isAdmin = (profile as Profile | null)?.role === 'admin'
@@ -38,23 +38,28 @@ export default async function ProjectsPage() {
   const projectsWithStats = (projects || []).map((project) => {
     const ncc = nccItems?.filter((c) => c.project_id === project.id) || []
     const expenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
-    const commitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
     const costs = customerCosts?.filter((c) => c.project_id === project.id) || []
+    const pl = plSummaries?.find((p) => p.project_id === project.id)
 
-    const totalFromNtp = ncc.reduce((s, c) => s + (c.received_amount || 0), 0)
-    const totalNccContract = ncc.reduce((s, c) => s + (c.contract_amount || 0), 0)
-    const totalCosts = costs.reduce((s, c) => s + (c.amount || 0), 0)
-    const totalCanManage = totalCosts + totalNccContract
-    const totalPlanned =
-      expenses.reduce((s, e) => s + (e.planned_amount || 0), 0) +
-      commitments.reduce((s, c) => s + (c.amount || 0), 0) +
-      totalCosts
-    const totalSpent =
-      expenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
-      commitments.reduce((s, c) => s + (c.paid_amount || 0), 0) +
-      costs.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
+    const nccContract = ncc.reduce((s, c) => s + (c.contract_amount || 0), 0)
+    const ntpAll = expenses.reduce((s, e) => s + (e.amount || 0), 0)
+    const ntpPlanned = expenses.filter(e => e.status === 'planned').reduce((s, e) => s + (e.amount || 0), 0)
+    const ntpCompleted = expenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
+    const khAll = costs.reduce((s, c) => s + (c.amount || 0), 0)
+    const khPlanned = costs.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
+    const khCompleted = costs.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
+    const khBudget = pl?.kh_budget || 0
 
-    return { ...project, totalFromNtp, totalPlanned, totalSpent, balance: totalFromNtp - totalSpent, totalCanManage }
+    const flexNcc = nccContract - ntpAll
+    const flexKH = khBudget - khAll
+    const flexProject = flexNcc + flexKH
+
+    const tienChiNcc = ntpAll
+    const cpkh = khAll
+    const tienPhaiChiKeHoach = khPlanned + ntpPlanned
+    const tienDaChi = khCompleted + ntpCompleted
+
+    return { ...project, tienChiNcc, cpkh, flexProject, tienPhaiChiKeHoach, tienDaChi }
   })
 
   return (
@@ -80,10 +85,11 @@ export default async function ProjectsPage() {
                     <TableHead>Mã dự án</TableHead>
                     <TableHead>Tên dự án</TableHead>
                     <TableHead>Khách hàng</TableHead>
-                    <TableHead className="text-right">Tiền nhận NCC</TableHead>
-                    <TableHead className="text-right">Tổng cần Manage</TableHead>
+                    <TableHead className="text-right">Tiền chi NCC/NTP</TableHead>
+                    <TableHead className="text-right">CPKH</TableHead>
+                    <TableHead className="text-right">Flex Project</TableHead>
+                    <TableHead className="text-right">Phải chi (kế hoạch)</TableHead>
                     <TableHead className="text-right">Đã chi</TableHead>
-                    <TableHead className="text-right">Số dư</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead>Ngày tạo</TableHead>
                   </TableRow>
@@ -104,17 +110,20 @@ export default async function ProjectsPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-gray-600">{project.client_name}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">
-                        {formatVND(project.totalFromNtp)}
+                      <TableCell className="text-right text-orange-600 font-medium">
+                        {formatVND(project.tienChiNcc)}
                       </TableCell>
-                      <TableCell className="text-right text-blue-600 font-medium">
-                        {formatVND(project.totalCanManage)}
+                      <TableCell className="text-right text-purple-600 font-medium">
+                        {formatVND(project.cpkh)}
+                      </TableCell>
+                      <TableCell className={`text-right font-bold ${project.flexProject >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {formatVND(project.flexProject)}
+                      </TableCell>
+                      <TableCell className="text-right text-yellow-600 font-medium">
+                        {formatVND(project.tienPhaiChiKeHoach)}
                       </TableCell>
                       <TableCell className="text-right text-red-600 font-medium">
-                        {formatVND(project.totalSpent)}
-                      </TableCell>
-                      <TableCell className={`text-right font-bold ${project.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatVND(project.balance)}
+                        {formatVND(project.tienDaChi)}
                       </TableCell>
                       <TableCell>
                         <Badge

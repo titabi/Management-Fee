@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import DashboardChart from '@/components/dashboard/DashboardChart'
-import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users, ShieldCheck, FolderOpen } from 'lucide-react'
+import { Building2, TrendingUp, Wallet, ArrowRight, BarChart3, Users, ShieldCheck, FolderOpen } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -62,14 +62,26 @@ export default async function DashboardPage() {
     return { name: project.code, fullName: project.name, tienCo, tienChi }
   })
 
-  const statCards = [
-    { title: 'Tổng dự án', value: String(totalProjects), sub: 'dự án đang quản lý', icon: Building2, gradient: 'from-blue-500 to-cyan-500', accent: 'text-slate-900' },
-    { title: 'Tổng doanh thu', value: formatVND(totalRevenue), sub: 'Tổng giá trị HĐ tất cả dự án', icon: TrendingUp, gradient: 'from-emerald-500 to-green-500', accent: 'text-emerald-600' },
-    { title: 'Tổng P11 đã ký', value: formatVND(totalP11), sub: 'Lợi nhuận P11 tổng hợp', icon: BarChart3, gradient: 'from-indigo-500 to-violet-500', accent: 'text-indigo-600' },
-    { title: 'Tổng CP Khách Hàng', value: formatVND(totalCustomerCosts), sub: `${customerCosts?.length || 0} mục chi phí KH`, icon: Users, gradient: 'from-purple-500 to-fuchsia-500', accent: 'text-purple-600' },
-    { title: 'Tổng Tiền control KH', value: formatVND(totalControlKH), sub: 'KH Budget − Tổng chi phí KH', icon: ShieldCheck, gradient: totalControlKH >= 0 ? 'from-sky-500 to-blue-500' : 'from-red-500 to-rose-500', accent: totalControlKH >= 0 ? 'text-sky-600' : 'text-red-600' },
-    { title: 'Tổng CP NCC/NTP', value: formatVND(totalNccContract), sub: 'Tổng giá trị HĐ các NCC', icon: Wallet, gradient: 'from-orange-500 to-amber-500', accent: 'text-orange-600' },
-    { title: 'Tổng Tiền control NCC', value: formatVND(totalControlNcc), sub: 'HĐ NCC − Tổng chi NTP', icon: TrendingDown, gradient: totalControlNcc >= 0 ? 'from-orange-500 to-amber-500' : 'from-red-500 to-rose-500', accent: totalControlNcc >= 0 ? 'text-orange-600' : 'text-red-600' },
+  const statCards: {
+    title: string
+    icon: typeof Building2
+    gradient: string
+    rows: { label?: string; value: string; accent: string }[]
+  }[] = [
+    { title: 'Doanh Thu', icon: TrendingUp, gradient: 'from-emerald-500 to-green-500', rows: [
+      { value: formatVND(totalRevenue), accent: 'text-emerald-600' },
+    ] },
+    { title: 'P11 Kí hợp đồng', icon: BarChart3, gradient: 'from-indigo-500 to-violet-500', rows: [
+      { value: formatVND(totalP11), accent: 'text-indigo-600' },
+    ] },
+    { title: 'Flex CPKH / CPKH', icon: Users, gradient: 'from-purple-500 to-fuchsia-500', rows: [
+      { label: 'Flex CPKH', value: formatVND(totalControlKH), accent: totalControlKH >= 0 ? 'text-sky-600' : 'text-red-600' },
+      { label: 'CPKH', value: formatVND(totalCustomerCosts), accent: 'text-purple-600' },
+    ] },
+    { title: 'Flex NCC/NTP / CP NCC/NTP', icon: Wallet, gradient: 'from-orange-500 to-amber-500', rows: [
+      { label: 'Flex NCC/NTP', value: formatVND(totalControlNcc), accent: totalControlNcc >= 0 ? 'text-orange-600' : 'text-red-600' },
+      { label: 'CP NCC/NTP', value: formatVND(totalNccContract), accent: 'text-amber-700' },
+    ] },
   ]
 
   return (
@@ -91,18 +103,18 @@ export default async function DashboardPage() {
         <div className="relative flex items-center justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-2 text-blue-200 text-sm font-medium mb-2">
-              <ShieldCheck className="h-4 w-4" /> Tổng tiền phải Manage
+              <ShieldCheck className="h-4 w-4" /> Tổng Tiền Flex
             </div>
             <p className="text-4xl font-bold text-white tracking-tight">{formatVND(totalManage)}</p>
-            <p className="text-blue-300/80 text-sm mt-1">Control KH + Control NCC · trên {totalProjects} dự án</p>
+            <p className="text-blue-300/80 text-sm mt-1">Flex CPKH + Flex NCC/NTP · trên {totalProjects} dự án</p>
           </div>
           <div className="flex gap-3">
             <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
-              <p className="text-xs text-blue-200">Control KH</p>
+              <p className="text-xs text-blue-200">Flex CPKH</p>
               <p className="text-lg font-semibold text-white">{formatVND(totalControlKH)}</p>
             </div>
             <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
-              <p className="text-xs text-blue-200">Control NCC</p>
+              <p className="text-xs text-blue-200">Flex NCC/NTP</p>
               <p className="text-lg font-semibold text-white">{formatVND(totalControlNcc)}</p>
             </div>
           </div>
@@ -122,8 +134,18 @@ export default async function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className={`text-2xl font-bold ${c.accent}`}>{c.value}</p>
-                <p className="text-xs text-slate-400 mt-1">{c.sub}</p>
+                {c.rows.length === 1 ? (
+                  <p className={`text-2xl font-bold ${c.rows[0].accent}`}>{c.rows[0].value}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {c.rows.map((r) => (
+                      <div key={r.label} className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-400">{r.label}</span>
+                        <span className={`text-lg font-bold ${r.accent}`}>{r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )

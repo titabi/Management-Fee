@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Profile } from '@/types'
-import TongQuan from '@/components/project-detail/TongQuan'
 import ChiPhiKhachHang from '@/components/project-detail/ChiPhiKhachHang'
 import HopDongNTP from '@/components/project-detail/HopDongNTP'
 import PLFinal from '@/components/project-detail/PLFinal'
@@ -75,51 +74,38 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-orange-700 font-medium">Tổng HĐ NCC</p>
+            <p className="text-xs text-orange-700 font-medium">Tổng HĐ NCC/NTP</p>
             <p className="text-lg font-bold text-orange-700">{formatVND(totalNccContract)}</p>
           </CardContent>
         </Card>
         <Card className={controlNcc >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
           <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Control NCC</p>
+            <p className={`text-xs font-medium ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Flex NCC/NTP</p>
             <p className={`text-lg font-bold ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(controlNcc)}</p>
           </CardContent>
         </Card>
         <Card className={controlKH >= 0 ? 'border-purple-200 bg-purple-50' : 'border-red-200 bg-red-50'}>
           <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>Control KH</p>
+            <p className={`text-xs font-medium ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>Flex CPKH</p>
             <p className={`text-lg font-bold ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>{formatVND(controlKH)}</p>
           </CardContent>
         </Card>
         <Card className={totalManage >= 0 ? 'border-blue-300 bg-blue-100' : 'border-red-200 bg-red-50'}>
           <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>Tổng Manage</p>
+            <p className={`text-xs font-medium ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>Flex Project</p>
             <p className={`text-lg font-bold ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(totalManage)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="tong-quan">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-5 w-full">
-          <TabsTrigger value="tong-quan" className="text-xs">Tổng quan</TabsTrigger>
+      <Tabs defaultValue="khach-hang">
+        <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
           <TabsTrigger value="khach-hang" className="text-xs">Chi phí KH</TabsTrigger>
           <TabsTrigger value="ncc-ntp" className="text-xs">NCC / NTP</TabsTrigger>
           <TabsTrigger value="pl-final" className="text-xs">P/L Final</TabsTrigger>
           <TabsTrigger value="cam-ket" className="text-xs">Cam kết khác</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="tong-quan">
-          <TongQuan
-            project={project}
-            nccItems={nccItems || []}
-            ntpExpenses={ntpExpenses || []}
-            otherCommitments={otherCommitments || []}
-            plSummary={plSummary || null}
-            isAdmin={isAdmin}
-            customerCosts={customerCosts || []}
-          />
-        </TabsContent>
 
         <TabsContent value="khach-hang">
           <ChiPhiKhachHang
