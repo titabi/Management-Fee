@@ -8,7 +8,6 @@ import { Profile } from '@/types'
 import TongQuan from '@/components/project-detail/TongQuan'
 import ChiPhiKhachHang from '@/components/project-detail/ChiPhiKhachHang'
 import HopDongNTP from '@/components/project-detail/HopDongNTP'
-import ChiTieuNTP from '@/components/project-detail/ChiTieuNTP'
 import PLFinal from '@/components/project-detail/PLFinal'
 import CamKetKhac from '@/components/project-detail/CamKetKhac'
 
@@ -102,11 +101,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {/* Tabs */}
       <Tabs defaultValue="tong-quan">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full">
+        <TabsList className="grid grid-cols-3 lg:grid-cols-5 w-full">
           <TabsTrigger value="tong-quan" className="text-xs">Tổng quan</TabsTrigger>
           <TabsTrigger value="khach-hang" className="text-xs">Chi phí KH</TabsTrigger>
           <TabsTrigger value="ncc-ntp" className="text-xs">NCC / NTP</TabsTrigger>
-          <TabsTrigger value="chi-tieu-ntp" className="text-xs">Chi tiêu NTP</TabsTrigger>
           <TabsTrigger value="pl-final" className="text-xs">P/L Final</TabsTrigger>
           <TabsTrigger value="cam-ket" className="text-xs">Cam kết khác</TabsTrigger>
         </TabsList>
@@ -138,16 +136,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             projectId={id}
             nccItems={nccItems || []}
             ntpExpenses={ntpExpenses || []}
-            isAdmin={isAdmin}
-            contractValue={plSummary?.contract_value || 0}
-          />
-        </TabsContent>
-
-        <TabsContent value="chi-tieu-ntp">
-          <ChiTieuNTP
-            projectId={id}
-            expenses={ntpExpenses || []}
-            nccItems={nccItems || []}
             isAdmin={isAdmin}
             contractValue={plSummary?.contract_value || 0}
           />
