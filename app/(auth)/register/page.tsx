@@ -23,12 +23,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
-  function handleInviteCheck(e: React.FormEvent) {
+  async function handleInviteCheck(e: React.FormEvent) {
     e.preventDefault()
-    const serverCode = process.env.NEXT_PUBLIC_INVITE_CODE || 'NTP2026'
-    if (inviteCode.trim() === serverCode) {
+    setInviteError('')
+    const res = await fetch('/api/check-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode.trim() }),
+    })
+    if (res.ok) {
       setStep('form')
-      setInviteError('')
     } else {
       setInviteError('Mã mời không đúng. Liên hệ quản trị viên để được cấp mã.')
     }
