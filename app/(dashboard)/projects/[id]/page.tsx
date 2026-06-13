@@ -51,6 +51,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const controlKH = (plSummary?.kh_budget || 0) - totalCustomerCosts
   const totalManage = controlNcc + controlKH
 
+  // Quỹ dự án (3 con số vàng)
+  const veQuyNcc = nccItems?.reduce((s, c) => s + (c.ve_quy || 0), 0) || 0
+  const veQuyKh = customerCosts?.reduce((s, c) => s + (c.ve_quy || 0), 0) || 0
+  const daChiQuy = otherCommitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0
+  const camKetQuy = otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const dangGiu = (veQuyNcc + veQuyKh) - daChiQuy
+  const nccPhaiThu = totalNccContract - veQuyNcc
+  const khPhaiThu = controlKH - veQuyKh
+  const phaiThu = nccPhaiThu + khPhaiThu
+  const phaiChi = camKetQuy - daChiQuy
+  const flexRong = (phaiThu + dangGiu) - phaiChi
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -97,6 +109,38 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardContent>
         </Card>
       </div>
+
+      {/* Quỹ dự án */}
+      <Card className="border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50">
+        <CardContent className="pt-5 pb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-bold text-slate-700">💰 Quỹ dự án</span>
+            <span className="text-xs text-slate-400">Dòng tiền cá nhân của bạn trên dự án này</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-white border border-emerald-200 p-3">
+              <p className="text-xs text-emerald-600 font-medium">Đang giữ</p>
+              <p className={`text-lg font-bold ${dangGiu >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatVND(dangGiu)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Đã về Quỹ − Đã chi</p>
+            </div>
+            <div className="rounded-lg bg-white border border-amber-200 p-3">
+              <p className="text-xs text-amber-600 font-medium">Phải thu</p>
+              <p className={`text-lg font-bold ${phaiThu >= 0 ? 'text-amber-700' : 'text-red-600'}`}>{formatVND(phaiThu)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Dự kiến về − Đã về Quỹ</p>
+            </div>
+            <div className="rounded-lg bg-white border border-red-200 p-3">
+              <p className="text-xs text-red-600 font-medium">Phải chi</p>
+              <p className={`text-lg font-bold ${phaiChi <= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatVND(phaiChi)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Cam kết chi − Đã chi</p>
+            </div>
+            <div className="rounded-lg bg-white border-2 border-blue-300 p-3">
+              <p className="text-xs text-blue-600 font-medium">Flex ròng</p>
+              <p className={`text-lg font-bold ${flexRong >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(flexRong)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">(Phải thu + Đang giữ) − Phải chi</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="khach-hang">

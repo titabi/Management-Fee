@@ -17,8 +17,8 @@ import { AmountInput } from '@/components/ui/amount-input'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
-const TYPES = ['Chi phí hãng', 'Phí môi giới', 'Khác']
-const statusLabels: Record<string, string> = { pending: 'Chưa thanh toán', paid: 'Đã thanh toán' }
+const TYPES = ['Môi giới', 'Thầu phụ thứ cấp', 'Chuyên gia', 'Ban bệ KH', 'Phát sinh', 'Khác']
+const statusLabels: Record<string, string> = { pending: 'Chưa chi', paid: 'Đã chi' }
 
 interface Props {
   projectId: string
@@ -28,7 +28,7 @@ interface Props {
 }
 
 const emptyForm = {
-  type: 'Khác', description: '', amount: '', paid_amount: '',
+  type: 'Môi giới', recipient: '', description: '', amount: '', paid_amount: '',
   due_date: '', status: 'pending' as OtherCommitment['status'], note: '',
 }
 
@@ -43,7 +43,7 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
   function openEdit(c: OtherCommitment) {
     setEditId(c.id)
     setForm({
-      type: c.type, description: c.description, amount: String(c.amount),
+      type: c.type, recipient: c.recipient || '', description: c.description, amount: String(c.amount),
       paid_amount: String(c.paid_amount), due_date: c.due_date || '', status: c.status, note: c.note || '',
     })
     setOpen(true)
@@ -54,7 +54,7 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
     setLoading(true)
     const supabase = createClient()
     const payload = {
-      project_id: projectId, type: form.type, description: form.description,
+      project_id: projectId, type: form.type, recipient: form.recipient || null, description: form.description,
       amount: parseInt(form.amount.replace(/\D/g, ''), 10) || 0,
       paid_amount: parseInt(form.paid_amount.replace(/\D/g, ''), 10) || 0,
       due_date: form.due_date || null, status: form.status, note: form.note || null,
@@ -88,14 +88,14 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
     <div className="mt-4 space-y-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Cam kết khác phải chi</CardTitle>
+          <CardTitle className="text-base">Sổ chi Quỹ</CardTitle>
           {isAdmin && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-1" />Thêm</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>{editId ? 'Cập nhật cam kết' : 'Thêm cam kết'}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editId ? 'Cập nhật khoản chi' : 'Thêm khoản chi Quỹ'}</DialogTitle></DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -117,11 +117,15 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Mô tả *</Label>
-                    <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required />
+                    <Label>Người nhận *</Label>
+                    <Input value={form.recipient} onChange={e => setForm({ ...form, recipient: e.target.value })} placeholder="Tên người/đơn vị nhận tiền" required />
                   </div>
-                  <AmountInput label="Số tiền cam kết" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} />
-                  <AmountInput label="Đã thanh toán" value={form.paid_amount} onChange={v => setForm({ ...form, paid_amount: v })} contractValue={contractValue} />
+                  <div className="space-y-2">
+                    <Label>Mô tả</Label>
+                    <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                  </div>
+                  <AmountInput label="Cam kết chi" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} />
+                  <AmountInput label="Đã chi" value={form.paid_amount} onChange={v => setForm({ ...form, paid_amount: v })} contractValue={contractValue} />
                   <div className="space-y-2">
                     <Label>Hạn thanh toán</Label>
                     <Input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
@@ -147,11 +151,12 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
                   <TableHeader>
                     <TableRow>
                       <TableHead>Loại</TableHead>
+                      <TableHead>Người nhận</TableHead>
                       <TableHead>Mô tả</TableHead>
-                      <TableHead className="text-right">Cam kết</TableHead>
-                      <TableHead className="text-right">Đã TT</TableHead>
+                      <TableHead className="text-right">Cam kết chi</TableHead>
+                      <TableHead className="text-right">Đã chi</TableHead>
                       <TableHead className="text-right">Còn lại</TableHead>
-                      <TableHead>Hạn TT</TableHead>
+                      <TableHead>Hạn chi</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       {isAdmin && <TableHead></TableHead>}
                     </TableRow>
@@ -160,7 +165,8 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
                     {commitments.map(c => (
                       <TableRow key={c.id}>
                         <TableCell><span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">{c.type}</span></TableCell>
-                        <TableCell className="font-medium">{c.description}</TableCell>
+                        <TableCell className="font-medium">{c.recipient || '—'}</TableCell>
+                        <TableCell className="text-gray-600">{c.description || '—'}</TableCell>
                         <TableCell className="text-right">{formatVND(c.amount)}</TableCell>
                         <TableCell className="text-right text-green-600">{formatVND(c.paid_amount)}</TableCell>
                         <TableCell className="text-right font-semibold text-orange-600">{formatVND(c.amount - c.paid_amount)}</TableCell>
@@ -185,11 +191,11 @@ export default function CamKetKhac({ projectId, commitments, isAdmin, contractVa
               </div>
               <div className="flex justify-end mt-3 pt-3 border-t gap-6">
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Tổng cam kết</p>
+                  <p className="text-xs text-gray-500">Tổng cam kết chi</p>
                   <p className="font-bold">{formatVND(totalAmount)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Đã thanh toán</p>
+                  <p className="text-xs text-gray-500">Đã chi</p>
                   <p className="font-bold text-green-600">{formatVND(totalPaid)}</p>
                 </div>
                 <div className="text-right">

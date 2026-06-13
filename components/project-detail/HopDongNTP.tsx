@@ -45,6 +45,7 @@ const emptyNccForm = {
   name: '',
   contract_amount: '',
   received_amount: '',
+  ve_quy: '',
   status: 'pending' as NccItem['status'],
   note: '',
 }
@@ -108,6 +109,7 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
       name: item.name,
       contract_amount: String(item.contract_amount),
       received_amount: String(item.received_amount),
+      ve_quy: item.ve_quy ? String(item.ve_quy) : '',
       status: item.status,
       note: item.note || '',
     })
@@ -123,6 +125,7 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
       name: nccForm.name,
       contract_amount: parseInt(nccForm.contract_amount.replace(/\D/g, ''), 10) || 0,
       received_amount: parseInt(nccForm.received_amount.replace(/\D/g, ''), 10) || 0,
+      ve_quy: parseInt(nccForm.ve_quy.replace(/\D/g, ''), 10) || 0,
       status: nccForm.status,
       note: nccForm.note || null,
     }
@@ -202,7 +205,8 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
   const totalNtpCompleted = ntpExpenses.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0)
   const totalControlNcc = totalNccContract - totalNtpAll
   const flexNcc = totalControlNcc
-  const veQuy = nccVeQuy || 0
+  const veQuyLines = nccItems.reduce((s, c) => s + (c.ve_quy || 0), 0)
+  const veQuy = veQuyLines || nccVeQuy || 0
   const nccPhaiThu = totalNccContract - veQuy
   const nccInQuy = veQuy - totalNtpCompleted
 
@@ -344,6 +348,10 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
                           <p className="text-xs text-gray-500">Kế hoạch</p>
                           <p className="text-sm font-semibold text-yellow-600">{formatVND(ntpPlanned)}</p>
                         </div>
+                        <div className="text-right hidden sm:block">
+                          <p className="text-xs text-gray-500">Về Quỹ</p>
+                          <p className="text-sm font-semibold text-emerald-600">{item.ve_quy ? formatVND(item.ve_quy) : '—'}</p>
+                        </div>
                         <div className="text-right">
                           <p className="text-xs text-gray-500">Tiền control</p>
                           <p className={`text-sm font-bold ${control >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(control)}</p>
@@ -451,6 +459,7 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, 
             </div>
             <AmountInput label="Giá trị HĐ" value={nccForm.contract_amount} onChange={v => setNccForm({ ...nccForm, contract_amount: v })} contractValue={contractValue} />
             <AmountInput label="Đã thanh toán" value={nccForm.received_amount} onChange={v => setNccForm({ ...nccForm, received_amount: v })} contractValue={contractValue} />
+            <AmountInput label="NCC về Quỹ (số tiền NCC trả lại về Quỹ)" value={nccForm.ve_quy} onChange={v => setNccForm({ ...nccForm, ve_quy: v })} contractValue={contractValue} />
             <div className="space-y-2">
               <Label>Trạng thái</Label>
               <Select value={nccForm.status} onValueChange={v => setNccForm({ ...nccForm, status: v as NccItem['status'] })}>

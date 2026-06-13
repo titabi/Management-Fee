@@ -47,8 +47,6 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
   const [p11Profit, setP11Profit] = useState(String(plSummary?.p11_profit || ''))
   const [nccBudget, setNccBudget] = useState(String(plSummary?.ncc_budget || ''))
   const [khBudget, setKhBudget] = useState(String(plSummary?.kh_budget || ''))
-  const [nccVeQuy, setNccVeQuy] = useState(String(plSummary?.ncc_ve_quy || ''))
-  const [khVeQuy, setKhVeQuy] = useState(String(plSummary?.kh_ve_quy || ''))
   const [note, setNote] = useState(plSummary?.note || '')
   const [excelFileName, setExcelFileName] = useState(plSummary?.excel_file_name || '')
   const [excelSheets, setExcelSheets] = useState<Record<string, (string | number)[][]> | null>(null)
@@ -120,8 +118,6 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
       p11_profit: parseInt(p11Profit.replace(/\D/g, ''), 10) || 0,
       ncc_budget: parseInt(nccBudget.replace(/\D/g, ''), 10) || 0,
       kh_budget: parseInt(khBudget.replace(/\D/g, ''), 10) || 0,
-      ncc_ve_quy: parseInt(nccVeQuy.replace(/\D/g, ''), 10) || 0,
-      kh_ve_quy: parseInt(khVeQuy.replace(/\D/g, ''), 10) || 0,
       note: note || null,
       excel_file_name: excelFileName || null,
       updated_at: new Date().toISOString(),
@@ -264,9 +260,10 @@ export default function PLFinal({ projectId, plSummary, nccItems, customerCosts,
               <AmountInput label="Lợi nhuận P11" value={p11Profit} onChange={setP11Profit} contractValue={cvNum} />
               <AmountInput label="Chi phí NCC/NTP (P/L Budget)" value={nccBudget} onChange={setNccBudget} contractValue={cvNum} />
               <AmountInput label="Chi phí Khách Hàng (KH Budget)" value={khBudget} onChange={setKhBudget} contractValue={cvNum} />
-              <AmountInput label="NCC về Quỹ" value={nccVeQuy} onChange={setNccVeQuy} contractValue={cvNum} />
-              <AmountInput label="CPKH về Quỹ" value={khVeQuy} onChange={setKhVeQuy} contractValue={cvNum} />
             </div>
+            <p className="text-xs text-gray-500 -mt-1">
+              💡 &quot;Về Quỹ&quot; nay được nhập theo từng dòng NCC (tab NCC/NTP) và từng dòng CPKH (tab Chi phí KH).
+            </p>
 
             <div className="space-y-2">
               <Label>Ghi chú</Label>

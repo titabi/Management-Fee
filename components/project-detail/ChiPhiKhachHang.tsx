@@ -36,6 +36,7 @@ const emptyForm = {
   status: 'planned' as 'planned' | 'completed',
   note: '',
   customer_name: '',
+  ve_quy: '',
 }
 
 function pct(amount: number, base: number) {
@@ -75,6 +76,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
       status: c.status || 'planned',
       note: c.note || '',
       customer_name: c.customer_name || '',
+      ve_quy: c.ve_quy ? String(c.ve_quy) : '',
     })
     setOpen(true)
   }
@@ -92,6 +94,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
       status: form.status,
       note: form.note || null,
       customer_name: form.customer_name || null,
+      ve_quy: parseInt(form.ve_quy.replace(/\D/g, ''), 10) || 0,
     }
     const res = editId
       ? await supabase.from('customer_costs').update(payload).eq('id', editId)
@@ -113,7 +116,8 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
   const daTraKH = customerCosts.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
   const traKHinPlan = customerCosts.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0)
   const flexKH = cpkh - daTraKH - traKHinPlan
-  const veQuy = khVeQuy || 0
+  const veQuyLines = customerCosts.reduce((s, c) => s + (c.ve_quy || 0), 0)
+  const veQuy = veQuyLines || khVeQuy || 0
   const phaiThu = flexKH - veQuy
   const inQuy = veQuy - daTraKH
   const totalAll = customerCosts.reduce((s, c) => s + (c.amount || 0), 0)
@@ -236,6 +240,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
                             <TableHead>Danh mục</TableHead>
                             <TableHead>Trạng thái</TableHead>
                             <TableHead className="text-right">Số tiền</TableHead>
+                            <TableHead className="text-right">Về Quỹ</TableHead>
                             <TableHead></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -255,6 +260,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
                                 {formatVND(cost.amount)}
                                 {contractValue ? <span className="text-xs text-gray-400 ml-1">({pct(cost.amount, contractValue)})</span> : null}
                               </TableCell>
+                              <TableCell className="text-right font-medium text-emerald-600">{cost.ve_quy ? formatVND(cost.ve_quy) : '—'}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
                                   <Button variant="ghost" size="sm" onClick={() => openEdit(cost)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
@@ -311,6 +317,7 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
               <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required placeholder="Tên chi phí..." />
             </div>
             <AmountInput label="Số tiền" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} required />
+            <AmountInput label="CPKH về Quỹ (số tiền đã nhận lại về Quỹ)" value={form.ve_quy} onChange={v => setForm({ ...form, ve_quy: v })} contractValue={contractValue} />
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Danh mục</Label>

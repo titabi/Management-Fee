@@ -30,6 +30,7 @@ export interface CustomerCost {
   status: 'planned' | 'completed'
   note: string | null
   customer_name: string | null
+  ve_quy: number
   created_at: string
 }
 
@@ -43,6 +44,7 @@ export interface NCCItem {
   received_amount: number
   status: NccItemStatus
   note: string | null
+  ve_quy: number
   created_at: string
 }
 
@@ -84,13 +86,14 @@ export interface PLSummary {
 // Alias
 export type PlSummary = PLSummary
 
-export type CommitmentType = 'Chi phí hãng' | 'Phí môi giới' | 'Khác'
+export type CommitmentType = 'Môi giới' | 'Thầu phụ thứ cấp' | 'Chuyên gia' | 'Ban bệ KH' | 'Phát sinh' | 'Khác'
 export type CommitmentStatus = 'pending' | 'paid'
 
 export interface OtherCommitment {
   id: string
   project_id: string
   type: string
+  recipient: string | null
   description: string
   amount: number
   paid_amount: number

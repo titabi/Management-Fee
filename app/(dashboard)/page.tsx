@@ -15,12 +15,14 @@ export default async function DashboardPage() {
     { data: ntpExpenses },
     { data: customerCosts },
     { data: plSummaries },
+    { data: commitments },
   ] = await Promise.all([
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
+    supabase.from('ncc_items').select('project_id, received_amount, contract_amount, ve_quy'),
     supabase.from('ntp_expenses').select('project_id, amount, status'),
-    supabase.from('customer_costs').select('project_id, amount, status'),
+    supabase.from('customer_costs').select('project_id, amount, status, ve_quy'),
     supabase.from('pl_summary').select('project_id, contract_value, p11_profit, kh_budget, ncc_ve_quy, kh_ve_quy'),
+    supabase.from('other_commitments').select('project_id, type, recipient, amount, paid_amount'),
   ])
 
   const totalProjects = projects?.length || 0
@@ -42,15 +44,45 @@ export default async function DashboardPage() {
   // Tổng Manage = KH control + NCC control (= Flex Project)
   const totalManage = totalControlKH + totalControlNcc
 
-  // "Về Quỹ" aggregates
-  const totalNccVeQuy = plSummaries?.reduce((s, p) => s + (p.ncc_ve_quy || 0), 0) || 0
-  const totalKhVeQuy = plSummaries?.reduce((s, p) => s + (p.kh_ve_quy || 0), 0) || 0
-  const totalNtpCompleted = ntpExpenses?.filter(e => e.status === 'completed').reduce((s, e) => s + (e.amount || 0), 0) || 0
-  const totalKhCompleted = customerCosts?.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0) || 0
-  // Money in Quỹ = Σ(NCC in Quỹ) + Σ(CPKH in Quỹ)
-  const moneyInQuy = (totalNccVeQuy - totalNtpCompleted) + (totalKhVeQuy - totalKhCompleted)
-  // Money phải thu = Σ(NCC phải thu) + Σ(CPKH phải thu)
+  // "Về Quỹ" per-line aggregates (fallback to pl_summary nếu chưa nhập theo dòng)
+  const totalNccVeQuy = (nccItems?.reduce((s, c) => s + (c.ve_quy || 0), 0) || 0)
+    || (plSummaries?.reduce((s, p) => s + (p.ncc_ve_quy || 0), 0) || 0)
+  const totalKhVeQuy = (customerCosts?.reduce((s, c) => s + (c.ve_quy || 0), 0) || 0)
+    || (plSummaries?.reduce((s, p) => s + (p.kh_ve_quy || 0), 0) || 0)
+
+  // 3 con số vàng (toàn bộ dự án)
+  const daChiQuy = commitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0
+  const camKetQuy = commitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const soDuQuy = (totalNccVeQuy + totalKhVeQuy) - daChiQuy            // Đang giữ
   const moneyPhaiThu = (totalNccContract - totalNccVeQuy) + (totalControlKH - totalKhVeQuy)
+  const moneyPhaiChi = camKetQuy - daChiQuy
+  const flexRongTong = (moneyPhaiThu + soDuQuy) - moneyPhaiChi
+
+  // Bảng "ai đang nợ mình" (phải thu theo dự án)
+  const phaiThuByProject = (projects || []).map((project) => {
+    const pNcc = nccItems?.filter((c) => c.project_id === project.id) || []
+    const pCosts = customerCosts?.filter((c) => c.project_id === project.id) || []
+    const pPl = plSummaries?.find((p) => p.project_id === project.id)
+    const nccContract = pNcc.reduce((s, c) => s + (c.contract_amount || 0), 0)
+    const nccVeQuy = pNcc.reduce((s, c) => s + (c.ve_quy || 0), 0)
+    const khVeQuy = pCosts.reduce((s, c) => s + (c.ve_quy || 0), 0)
+    const khTotal = pCosts.reduce((s, c) => s + (c.amount || 0), 0)
+    const controlKH = (pPl?.kh_budget || 0) - khTotal
+    const phaiThu = (nccContract - nccVeQuy) + (controlKH - khVeQuy)
+    return { project, phaiThu }
+  }).filter(r => r.phaiThu > 0).sort((a, b) => b.phaiThu - a.phaiThu)
+
+  // Bảng "mình đang nợ ai" (phải chi theo người nhận)
+  const phaiChiByRecipient: { recipient: string; type: string; remaining: number }[] = []
+  for (const c of commitments || []) {
+    const remaining = (c.amount || 0) - (c.paid_amount || 0)
+    if (remaining <= 0) continue
+    const key = c.recipient || '(Chưa rõ)'
+    const existing = phaiChiByRecipient.find(x => x.recipient === key && x.type === (c.type || ''))
+    if (existing) existing.remaining += remaining
+    else phaiChiByRecipient.push({ recipient: key, type: c.type || '', remaining })
+  }
+  phaiChiByRecipient.sort((a, b) => b.remaining - a.remaining)
 
   const statusLabels: Record<string, string> = {
     active: 'Đang hoạt động',
@@ -128,12 +160,20 @@ export default async function DashboardPage() {
               <p className="text-lg font-semibold text-white">{formatVND(totalControlNcc)}</p>
             </div>
             <div className="rounded-xl bg-emerald-400/15 backdrop-blur px-4 py-3 border border-emerald-300/20">
-              <p className="text-xs text-emerald-200">Money in Quỹ</p>
-              <p className="text-lg font-semibold text-white">{formatVND(moneyInQuy)}</p>
+              <p className="text-xs text-emerald-200">Số dư Quỹ (đang giữ)</p>
+              <p className="text-lg font-semibold text-white">{formatVND(soDuQuy)}</p>
             </div>
             <div className="rounded-xl bg-amber-400/15 backdrop-blur px-4 py-3 border border-amber-300/20">
-              <p className="text-xs text-amber-200">Money phải thu</p>
+              <p className="text-xs text-amber-200">Phải thu</p>
               <p className="text-lg font-semibold text-white">{formatVND(moneyPhaiThu)}</p>
+            </div>
+            <div className="rounded-xl bg-red-400/15 backdrop-blur px-4 py-3 border border-red-300/20">
+              <p className="text-xs text-red-200">Phải chi</p>
+              <p className="text-lg font-semibold text-white">{formatVND(moneyPhaiChi)}</p>
+            </div>
+            <div className="rounded-xl bg-blue-400/20 backdrop-blur px-4 py-3 border border-blue-300/30">
+              <p className="text-xs text-blue-100">Flex ròng</p>
+              <p className="text-lg font-semibold text-white">{formatVND(flexRongTong)}</p>
             </div>
           </div>
         </div>
@@ -168,6 +208,69 @@ export default async function DashboardPage() {
             </Card>
           )
         })}
+      </div>
+
+      {/* Ai nợ mình / Mình nợ ai */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="text-emerald-600">↙</span> Ai đang nợ mình (Phải thu)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {phaiThuByProject.length > 0 ? (
+              <div className="space-y-2">
+                {phaiThuByProject.map(({ project, phaiThu }) => (
+                  <Link key={project.id} href={`/projects/${project.id}`}>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 border border-slate-100">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-mono text-[11px] font-bold px-2 py-1 rounded">{project.code}</span>
+                        <span className="text-sm text-slate-600 truncate">{project.client_name || project.name}</span>
+                      </div>
+                      <span className="text-sm font-bold text-amber-600 shrink-0">{formatVND(phaiThu)}</span>
+                    </div>
+                  </Link>
+                ))}
+                <div className="flex justify-between pt-2 mt-1 border-t text-sm font-semibold">
+                  <span className="text-slate-500">Tổng phải thu</span>
+                  <span className="text-amber-700">{formatVND(moneyPhaiThu)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-center text-slate-400 py-6 text-sm">Không có khoản phải thu</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="text-red-600">↗</span> Mình đang nợ ai (Phải chi)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {phaiChiByRecipient.length > 0 ? (
+              <div className="space-y-2">
+                {phaiChiByRecipient.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded shrink-0">{r.type}</span>
+                      <span className="text-sm text-slate-600 truncate">{r.recipient}</span>
+                    </div>
+                    <span className="text-sm font-bold text-red-600 shrink-0">{formatVND(r.remaining)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2 mt-1 border-t text-sm font-semibold">
+                  <span className="text-slate-500">Tổng phải chi</span>
+                  <span className="text-red-700">{formatVND(moneyPhaiChi)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-center text-slate-400 py-6 text-sm">Không có khoản phải chi</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Chart */}
