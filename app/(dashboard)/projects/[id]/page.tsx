@@ -129,6 +129,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             projectId={id}
             customerCosts={customerCosts || []}
             isAdmin={isAdmin}
+            contractValue={plSummary?.contract_value || 0}
           />
         </TabsContent>
 
@@ -138,6 +139,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             nccItems={nccItems || []}
             ntpExpenses={ntpExpenses || []}
             isAdmin={isAdmin}
+            contractValue={plSummary?.contract_value || 0}
           />
         </TabsContent>
 
@@ -147,6 +149,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             expenses={ntpExpenses || []}
             nccItems={nccItems || []}
             isAdmin={isAdmin}
+            contractValue={plSummary?.contract_value || 0}
           />
         </TabsContent>
 
@@ -166,6 +169,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             projectId={id}
             commitments={otherCommitments || []}
             isAdmin={isAdmin}
+            contractValue={plSummary?.contract_value || 0}
           />
         </TabsContent>
       </Tabs>

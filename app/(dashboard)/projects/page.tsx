@@ -23,12 +23,14 @@ export default async function ProjectsPage() {
     { data: nccItems },
     { data: ntpExpenses },
     { data: otherCommitments },
+    { data: customerCosts },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ncc_items').select('project_id, received_amount'),
+    supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
     supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
     supabase.from('other_commitments').select('project_id, amount, paid_amount'),
+    supabase.from('customer_costs').select('project_id, amount, status'),
   ])
 
   const isAdmin = (profile as Profile | null)?.role === 'admin'
@@ -37,16 +39,22 @@ export default async function ProjectsPage() {
     const ncc = nccItems?.filter((c) => c.project_id === project.id) || []
     const expenses = ntpExpenses?.filter((e) => e.project_id === project.id) || []
     const commitments = otherCommitments?.filter((c) => c.project_id === project.id) || []
+    const costs = customerCosts?.filter((c) => c.project_id === project.id) || []
 
     const totalFromNtp = ncc.reduce((s, c) => s + (c.received_amount || 0), 0)
+    const totalNccContract = ncc.reduce((s, c) => s + (c.contract_amount || 0), 0)
+    const totalCosts = costs.reduce((s, c) => s + (c.amount || 0), 0)
+    const totalCanManage = totalCosts + totalNccContract
     const totalPlanned =
       expenses.reduce((s, e) => s + (e.planned_amount || 0), 0) +
-      commitments.reduce((s, c) => s + (c.amount || 0), 0)
+      commitments.reduce((s, c) => s + (c.amount || 0), 0) +
+      totalCosts
     const totalSpent =
       expenses.reduce((s, e) => s + (e.actual_amount || 0), 0) +
-      commitments.reduce((s, c) => s + (c.paid_amount || 0), 0)
+      commitments.reduce((s, c) => s + (c.paid_amount || 0), 0) +
+      costs.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
 
-    return { ...project, totalFromNtp, totalPlanned, totalSpent, balance: totalFromNtp - totalSpent }
+    return { ...project, totalFromNtp, totalPlanned, totalSpent, balance: totalFromNtp - totalSpent, totalCanManage }
   })
 
   return (
@@ -73,6 +81,7 @@ export default async function ProjectsPage() {
                     <TableHead>Tên dự án</TableHead>
                     <TableHead>Khách hàng</TableHead>
                     <TableHead className="text-right">Tiền nhận NCC</TableHead>
+                    <TableHead className="text-right">Tổng cần Manage</TableHead>
                     <TableHead className="text-right">Đã chi</TableHead>
                     <TableHead className="text-right">Số dư</TableHead>
                     <TableHead>Trạng thái</TableHead>

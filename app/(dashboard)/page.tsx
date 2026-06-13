@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import DashboardChart from '@/components/dashboard/DashboardChart'
-import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight } from 'lucide-react'
+import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -14,21 +14,34 @@ export default async function DashboardPage() {
     { data: nccItems },
     { data: ntpExpenses },
     { data: otherCommitments },
+    { data: customerCosts },
   ] = await Promise.all([
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ncc_items').select('project_id, received_amount'),
+    supabase.from('ncc_items').select('project_id, received_amount, contract_amount'),
     supabase.from('ntp_expenses').select('project_id, planned_amount, actual_amount'),
     supabase.from('other_commitments').select('project_id, amount, paid_amount'),
+    supabase.from('customer_costs').select('project_id, amount, status'),
   ])
 
   const totalProjects = projects?.length || 0
   const totalFromNtp = nccItems?.reduce((s, c) => s + (c.received_amount || 0), 0) || 0
+  const totalNccContract = nccItems?.reduce((s, c) => s + (c.contract_amount || 0), 0) || 0
+  const totalNtpActual = ntpExpenses?.reduce((s, e) => s + (e.actual_amount || 0), 0) || 0
+  // NCC còn lại = tổng HĐ - tổng đã chi NTP
+  const nccConLai = Math.max(0, totalNccContract - totalNtpActual)
+  const nccDaChi = totalNtpActual
+  // Chi phí KH
+  const khConLai = customerCosts?.filter(c => c.status === 'planned').reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const khDaChi = customerCosts?.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0) || 0
+  const totalCustomerCosts = khConLai + khDaChi
+  // Tổng cần Manage = KH còn lại + NCC còn lại
+  const totalCanManage = khConLai + nccConLai
   const totalPlanned =
     (ntpExpenses?.reduce((s, e) => s + (e.planned_amount || 0), 0) || 0) +
-    (otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0)
-  const totalSpent =
-    (ntpExpenses?.reduce((s, e) => s + (e.actual_amount || 0), 0) || 0) +
-    (otherCommitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0)
+    (otherCommitments?.reduce((s, c) => s + (c.amount || 0), 0) || 0) +
+    totalCustomerCosts
+  const totalSpent = totalNtpActual +
+    (otherCommitments?.reduce((s, c) => s + (c.paid_amount || 0), 0) || 0) + khDaChi
 
   // Per-project chart data
   const chartData = (projects || []).map((project) => {
@@ -68,7 +81,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Tổng dự án</CardTitle>
@@ -91,6 +104,42 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Chi phí KH */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-purple-700">👥 Chi phí KH còn lại</CardTitle>
+            <Users className="h-5 w-5 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-yellow-600">{formatVND(khConLai)}</p>
+            <p className="text-xs text-gray-500 mt-1">Đã chi: <span className="text-green-600 font-medium">{formatVND(khDaChi)}</span></p>
+          </CardContent>
+        </Card>
+
+        {/* NCC còn lại */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-orange-700">🏗️ NCC còn lại</CardTitle>
+            <TrendingUp className="h-5 w-5 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-orange-600">{formatVND(nccConLai)}</p>
+            <p className="text-xs text-gray-500 mt-1">Đã chi NTP: <span className="text-red-600 font-medium">{formatVND(nccDaChi)}</span></p>
+          </CardContent>
+        </Card>
+
+        {/* Tổng cần Manage */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">💼 Tổng cần Manage</CardTitle>
+            <BarChart3 className="h-5 w-5 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-700">{formatVND(totalCanManage)}</p>
+            <p className="text-xs text-blue-500 mt-1">KH còn lại + NCC còn lại</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Tổng chi kế hoạch</CardTitle>
@@ -98,7 +147,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-orange-600">{formatVND(totalPlanned)}</p>
-            <p className="text-xs text-gray-500 mt-1">chi tiêu kế hoạch</p>
+            <p className="text-xs text-gray-500 mt-1">NTP + cam kết + chi phí KH</p>
           </CardContent>
         </Card>
 
@@ -109,7 +158,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-red-600">{formatVND(totalSpent)}</p>
-            <p className="text-xs text-gray-500 mt-1">chi tiêu thực tế</p>
+            <p className="text-xs text-gray-500 mt-1">NTP + cam kết + KH đã chi</p>
           </CardContent>
         </Card>
       </div>

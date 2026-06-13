@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Plus, Trash2, Pencil, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -31,6 +32,7 @@ interface Props {
   expenses: NtpExpense[]
   nccItems: NCCItem[]
   isAdmin: boolean
+  contractValue?: number
 }
 
 const emptyForm = {
@@ -39,7 +41,7 @@ const emptyForm = {
   status: 'planned' as NtpExpense['status'], note: '',
 }
 
-export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin }: Props) {
+export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin, contractValue }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -167,16 +169,8 @@ export default function ChiTieuNTP({ projectId, expenses, nccItems, isAdmin }: P
                       <Label>Mô tả *</Label>
                       <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label>Chi kế hoạch (VND)</Label>
-                        <Input type="number" value={form.planned_amount} onChange={e => setForm({ ...form, planned_amount: e.target.value })} placeholder="0" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Chi thực tế (VND)</Label>
-                        <Input type="number" value={form.actual_amount} onChange={e => setForm({ ...form, actual_amount: e.target.value })} placeholder="0" />
-                      </div>
-                    </div>
+                    <AmountInput label="Chi kế hoạch" value={form.planned_amount} onChange={v => setForm({ ...form, planned_amount: v })} contractValue={contractValue} />
+                    <AmountInput label="Chi thực tế" value={form.actual_amount} onChange={v => setForm({ ...form, actual_amount: v })} contractValue={contractValue} />
                     <div className="space-y-2">
                       <Label>Ngày</Label>
                       <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />

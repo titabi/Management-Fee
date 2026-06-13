@@ -27,6 +27,7 @@ export interface CustomerCost {
   amount: number
   category: string
   date: string
+  status: 'planned' | 'completed'
   note: string | null
   created_at: string
 }

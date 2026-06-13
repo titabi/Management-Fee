@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -23,6 +24,7 @@ interface Props {
   projectId: string
   commitments: OtherCommitment[]
   isAdmin: boolean
+  contractValue?: number
 }
 
 const emptyForm = {
@@ -30,7 +32,7 @@ const emptyForm = {
   due_date: '', status: 'pending' as OtherCommitment['status'], note: '',
 }
 
-export default function CamKetKhac({ projectId, commitments, isAdmin }: Props) {
+export default function CamKetKhac({ projectId, commitments, isAdmin, contractValue }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -118,16 +120,8 @@ export default function CamKetKhac({ projectId, commitments, isAdmin }: Props) {
                     <Label>Mô tả *</Label>
                     <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Số tiền cam kết (VND)</Label>
-                      <Input type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Đã thanh toán (VND)</Label>
-                      <Input type="number" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} placeholder="0" />
-                    </div>
-                  </div>
+                  <AmountInput label="Số tiền cam kết" value={form.amount} onChange={v => setForm({ ...form, amount: v })} contractValue={contractValue} />
+                  <AmountInput label="Đã thanh toán" value={form.paid_amount} onChange={v => setForm({ ...form, paid_amount: v })} contractValue={contractValue} />
                   <div className="space-y-2">
                     <Label>Hạn thanh toán</Label>
                     <Input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />

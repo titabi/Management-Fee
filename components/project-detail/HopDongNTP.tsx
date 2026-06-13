@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -28,6 +29,7 @@ interface Props {
   nccItems: NccItem[]
   ntpExpenses: NtpExpense[]
   isAdmin: boolean
+  contractValue?: number
 }
 
 const emptyForm = {
@@ -38,7 +40,7 @@ const emptyForm = {
   note: '',
 }
 
-export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin }: Props) {
+export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin, contractValue }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -124,26 +126,8 @@ export default function HopDongNTP({ projectId, nccItems, ntpExpenses, isAdmin }
                       placeholder="Tên nhà cung cấp / nhà thầu phụ"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Giá trị HĐ (VND)</Label>
-                      <Input
-                        type="number"
-                        value={form.contract_amount}
-                        onChange={e => setForm({ ...form, contract_amount: e.target.value })}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Đã thanh toán (VND)</Label>
-                      <Input
-                        type="number"
-                        value={form.received_amount}
-                        onChange={e => setForm({ ...form, received_amount: e.target.value })}
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
+                  <AmountInput label="Giá trị HĐ" value={form.contract_amount} onChange={v => setForm({ ...form, contract_amount: v })} contractValue={contractValue} />
+                  <AmountInput label="Đã thanh toán" value={form.received_amount} onChange={v => setForm({ ...form, received_amount: v })} contractValue={contractValue} />
                   <div className="space-y-2">
                     <Label>Trạng thái</Label>
                     <Select value={form.status} onValueChange={v => setForm({ ...form, status: v as NccItem['status'] })}>
