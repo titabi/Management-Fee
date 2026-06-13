@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -9,16 +8,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Building2 } from 'lucide-react'
+import { Building2, CheckCircle2 } from 'lucide-react'
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -38,9 +37,27 @@ export default function RegisterPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push('/')
-      router.refresh()
+      setSuccess(true)
     }
+  }
+
+  if (success) {
+    return (
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardContent className="pt-8 pb-8 text-center space-y-4">
+          <div className="flex justify-center">
+            <CheckCircle2 className="h-16 w-16 text-green-500" />
+          </div>
+          <h2 className="text-xl font-bold text-green-700">Đăng ký thành công!</h2>
+          <p className="text-gray-600 text-sm">
+            Tài khoản <strong>{email}</strong> đã được tạo.
+          </p>
+          <Link href="/login">
+            <Button className="w-full mt-2">Đăng nhập ngay →</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
