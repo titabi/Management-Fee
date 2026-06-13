@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2 } from 'lucide-react'
+import { Wallet } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -35,15 +35,15 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-md shadow-2xl">
+    <Card className="w-full shadow-2xl border-white/20 bg-white/95 backdrop-blur">
       <CardHeader className="text-center space-y-2">
         <div className="flex justify-center">
-          <div className="bg-blue-600 p-3 rounded-full">
-            <Building2 className="h-8 w-8 text-white" />
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3.5 rounded-2xl shadow-lg shadow-blue-500/30">
+            <Wallet className="h-8 w-8 text-white" />
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold">Quản Lý Quỹ Dự Án</CardTitle>
-        <CardDescription>Đăng nhập vào tài khoản của bạn</CardDescription>
+        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">FundFlow</CardTitle>
+        <CardDescription>Đăng nhập vào hệ thống quản lý quỹ dự án</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleLogin} className="space-y-4">
@@ -72,7 +72,7 @@ export default function LoginPage() {
           {error && (
             <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</p>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25" disabled={loading}>
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </Button>
         </form>

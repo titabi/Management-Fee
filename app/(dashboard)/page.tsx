@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import DashboardChart from '@/components/dashboard/DashboardChart'
-import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users, ShieldCheck } from 'lucide-react'
+import { Building2, TrendingUp, TrendingDown, Wallet, ArrowRight, BarChart3, Users, ShieldCheck, FolderOpen } from 'lucide-react'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -62,102 +62,72 @@ export default async function DashboardPage() {
     return { name: project.code, fullName: project.name, tienCo, tienChi }
   })
 
+  const statCards = [
+    { title: 'Tổng dự án', value: String(totalProjects), sub: 'dự án đang quản lý', icon: Building2, gradient: 'from-blue-500 to-cyan-500', accent: 'text-slate-900' },
+    { title: 'Tổng doanh thu', value: formatVND(totalRevenue), sub: 'Tổng giá trị HĐ tất cả dự án', icon: TrendingUp, gradient: 'from-emerald-500 to-green-500', accent: 'text-emerald-600' },
+    { title: 'Tổng P11 đã ký', value: formatVND(totalP11), sub: 'Lợi nhuận P11 tổng hợp', icon: BarChart3, gradient: 'from-indigo-500 to-violet-500', accent: 'text-indigo-600' },
+    { title: 'Tổng CP Khách Hàng', value: formatVND(totalCustomerCosts), sub: `${customerCosts?.length || 0} mục chi phí KH`, icon: Users, gradient: 'from-purple-500 to-fuchsia-500', accent: 'text-purple-600' },
+    { title: 'Tổng Tiền control KH', value: formatVND(totalControlKH), sub: 'KH Budget − Tổng chi phí KH', icon: ShieldCheck, gradient: totalControlKH >= 0 ? 'from-sky-500 to-blue-500' : 'from-red-500 to-rose-500', accent: totalControlKH >= 0 ? 'text-sky-600' : 'text-red-600' },
+    { title: 'Tổng CP NCC/NTP', value: formatVND(totalNccContract), sub: 'Tổng giá trị HĐ các NCC', icon: Wallet, gradient: 'from-orange-500 to-amber-500', accent: 'text-orange-600' },
+    { title: 'Tổng Tiền control NCC', value: formatVND(totalControlNcc), sub: 'HĐ NCC − Tổng chi NTP', icon: TrendingDown, gradient: totalControlNcc >= 0 ? 'from-orange-500 to-amber-500' : 'from-red-500 to-rose-500', accent: totalControlNcc >= 0 ? 'text-orange-600' : 'text-red-600' },
+  ]
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tổng quan</h1>
-        <p className="text-gray-500 text-sm">Theo dõi tài chính tất cả dự án</p>
+    <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tổng quan</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Theo dõi tài chính tất cả dự án theo thời gian thực</p>
+        </div>
+        <Link href="/projects" className="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow">
+          <FolderOpen className="h-4 w-4" /> Xem dự án
+        </Link>
+      </div>
+
+      {/* Hero: Tổng tiền phải Manage */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 p-6 shadow-xl">
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 h-48 w-48 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-indigo-500/20 blur-2xl" />
+        <div className="relative flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-blue-200 text-sm font-medium mb-2">
+              <ShieldCheck className="h-4 w-4" /> Tổng tiền phải Manage
+            </div>
+            <p className="text-4xl font-bold text-white tracking-tight">{formatVND(totalManage)}</p>
+            <p className="text-blue-300/80 text-sm mt-1">Control KH + Control NCC · trên {totalProjects} dự án</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
+              <p className="text-xs text-blue-200">Control KH</p>
+              <p className="text-lg font-semibold text-white">{formatVND(totalControlKH)}</p>
+            </div>
+            <div className="rounded-xl bg-white/10 backdrop-blur px-4 py-3 border border-white/10">
+              <p className="text-xs text-blue-200">Control NCC</p>
+              <p className="text-lg font-semibold text-white">{formatVND(totalControlNcc)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng dự án</CardTitle>
-            <Building2 className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{totalProjects}</p>
-            <p className="text-xs text-gray-500 mt-1">dự án đang quản lý</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng doanh thu</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">{formatVND(totalRevenue)}</p>
-            <p className="text-xs text-gray-500 mt-1">Tổng giá trị HĐ tất cả dự án</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng P11 đã ký</CardTitle>
-            <BarChart3 className="h-5 w-5 text-indigo-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-indigo-600">{formatVND(totalP11)}</p>
-            <p className="text-xs text-gray-500 mt-1">Lợi nhuận P11 tổng hợp</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-300 bg-blue-50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700">Tổng tiền phải Manage</CardTitle>
-            <ShieldCheck className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-blue-800">{formatVND(totalManage)}</p>
-            <p className="text-xs text-blue-500 mt-1">Control KH + Control NCC</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng CP Khách Hàng</CardTitle>
-            <Users className="h-5 w-5 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-purple-600">{formatVND(totalCustomerCosts)}</p>
-            <p className="text-xs text-gray-500 mt-1">{customerCosts?.length || 0} mục chi phí KH</p>
-          </CardContent>
-        </Card>
-
-        <Card className={totalControlKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className={`text-sm font-medium ${totalControlKH >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Tổng Tiền control KH</CardTitle>
-            <ShieldCheck className={`h-5 w-5 ${totalControlKH >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${totalControlKH >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(totalControlKH)}</p>
-            <p className="text-xs text-gray-500 mt-1">KH Budget - Tổng chi phí KH</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Tổng CP NCC/NTP</CardTitle>
-            <Wallet className="h-5 w-5 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-orange-600">{formatVND(totalNccContract)}</p>
-            <p className="text-xs text-gray-500 mt-1">Tổng giá trị HĐ các NCC</p>
-          </CardContent>
-        </Card>
-
-        <Card className={totalControlNcc >= 0 ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className={`text-sm font-medium ${totalControlNcc >= 0 ? 'text-orange-700' : 'text-red-700'}`}>Tổng Tiền control NCC</CardTitle>
-            <TrendingDown className={`h-5 w-5 ${totalControlNcc >= 0 ? 'text-orange-500' : 'text-red-500'}`} />
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${totalControlNcc >= 0 ? 'text-orange-700' : 'text-red-700'}`}>{formatVND(totalControlNcc)}</p>
-            <p className="text-xs text-gray-500 mt-1">HĐ NCC - Tổng chi NTP</p>
-          </CardContent>
-        </Card>
+        {statCards.map((c) => {
+          const Icon = c.icon
+          return (
+            <Card key={c.title} className="group border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500">{c.title}</CardTitle>
+                <div className={`bg-gradient-to-br ${c.gradient} p-2 rounded-xl shadow-sm group-hover:scale-110 transition-transform`}>
+                  <Icon className="h-4 w-4 text-white" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-2xl font-bold ${c.accent}`}>{c.value}</p>
+                <p className="text-xs text-slate-400 mt-1">{c.sub}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Chart */}
@@ -197,9 +167,9 @@ export default async function DashboardPage() {
 
                 return (
                   <Link key={project.id} href={`/projects/${project.id}`}>
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-slate-200/80 hover:border-blue-200 hover:shadow-sm transition-all group">
                       <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 text-blue-700 font-mono text-xs font-bold px-2 py-1 rounded">
+                        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-mono text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-sm group-hover:scale-105 transition-transform">
                           {project.code}
                         </div>
                         <div>

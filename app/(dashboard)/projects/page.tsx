@@ -58,11 +58,11 @@ export default async function ProjectsPage() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Danh sách Dự án</h1>
-          <p className="text-gray-500 text-sm">Quản lý tất cả các dự án</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Danh sách Dự án</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Quản lý tất cả các dự án</p>
         </div>
         {isAdmin && <CreateProjectDialog />}
       </div>
@@ -90,10 +90,10 @@ export default async function ProjectsPage() {
                 </TableHeader>
                 <TableBody>
                   {projectsWithStats.map((project) => (
-                    <TableRow key={project.id} className="cursor-pointer hover:bg-gray-50">
+                    <TableRow key={project.id} className="cursor-pointer hover:bg-slate-50">
                       <TableCell>
                         <Link href={`/projects/${project.id}`} className="block">
-                          <span className="bg-blue-100 text-blue-700 font-mono text-xs font-bold px-2 py-1 rounded">
+                          <span className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-mono text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-sm">
                             {project.code}
                           </span>
                         </Link>
@@ -106,6 +106,9 @@ export default async function ProjectsPage() {
                       <TableCell className="text-gray-600">{project.client_name}</TableCell>
                       <TableCell className="text-right text-green-600 font-medium">
                         {formatVND(project.totalFromNtp)}
+                      </TableCell>
+                      <TableCell className="text-right text-blue-600 font-medium">
+                        {formatVND(project.totalCanManage)}
                       </TableCell>
                       <TableCell className="text-right text-red-600 font-medium">
                         {formatVND(project.totalSpent)}
