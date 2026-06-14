@@ -27,9 +27,9 @@ export default async function ProjectsPage() {
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase.from('projects').select('*').order('created_at', { ascending: false }),
-    supabase.from('ncc_items').select('project_id, contract_amount'),
+    supabase.from('ncc_items').select('project_id, contract_amount, ve_quy'),
     supabase.from('ntp_expenses').select('project_id, amount, status'),
-    supabase.from('customer_costs').select('project_id, amount, status'),
+    supabase.from('customer_costs').select('project_id, amount, status, ve_quy'),
     supabase.from('pl_summary').select('project_id, kh_budget, ncc_ve_quy, kh_ve_quy'),
   ])
 
@@ -47,8 +47,8 @@ export default async function ProjectsPage() {
     const khAll = costs.reduce((s, c) => s + (c.amount || 0), 0)
     const khCompleted = costs.filter(c => c.status === 'completed').reduce((s, c) => s + (c.amount || 0), 0)
     const khBudget = pl?.kh_budget || 0
-    const nccVeQuy = pl?.ncc_ve_quy || 0
-    const khVeQuy = pl?.kh_ve_quy || 0
+    const nccVeQuy = ncc.reduce((s, c) => s + (c.ve_quy || 0), 0) || (pl?.ncc_ve_quy || 0)
+    const khVeQuy = costs.reduce((s, c) => s + (c.ve_quy || 0), 0) || (pl?.kh_ve_quy || 0)
 
     const flexNcc = nccContract - ntpAll
     const flexKH = khBudget - khAll
@@ -61,6 +61,18 @@ export default async function ProjectsPage() {
 
     return { ...project, flexProject, cpkh, cpkhInQuy, nccContract, nccInQuy, tongPhaiThu }
   })
+
+  const totals = projectsWithStats.reduce(
+    (a, p) => ({
+      flexProject: a.flexProject + p.flexProject,
+      cpkh: a.cpkh + p.cpkh,
+      cpkhInQuy: a.cpkhInQuy + p.cpkhInQuy,
+      nccContract: a.nccContract + p.nccContract,
+      nccInQuy: a.nccInQuy + p.nccInQuy,
+      tongPhaiThu: a.tongPhaiThu + p.tongPhaiThu,
+    }),
+    { flexProject: 0, cpkh: 0, cpkhInQuy: 0, nccContract: 0, nccInQuy: 0, tongPhaiThu: 0 }
+  )
 
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
@@ -144,6 +156,18 @@ export default async function ProjectsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
+                <tfoot>
+                  <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                    <TableCell colSpan={3} className="text-slate-700">Tổng cộng ({projectsWithStats.length} dự án)</TableCell>
+                    <TableCell className={`text-right ${totals.flexProject >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(totals.flexProject)}</TableCell>
+                    <TableCell className="text-right text-purple-700">{formatVND(totals.cpkh)}</TableCell>
+                    <TableCell className={`text-right ${totals.cpkhInQuy >= 0 ? 'text-green-700' : 'text-red-600'}`}>{formatVND(totals.cpkhInQuy)}</TableCell>
+                    <TableCell className="text-right text-orange-700">{formatVND(totals.nccContract)}</TableCell>
+                    <TableCell className={`text-right ${totals.nccInQuy >= 0 ? 'text-green-700' : 'text-red-600'}`}>{formatVND(totals.nccInQuy)}</TableCell>
+                    <TableCell className="text-right text-amber-700">{formatVND(totals.tongPhaiThu)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </tfoot>
               </Table>
             </div>
           ) : (
