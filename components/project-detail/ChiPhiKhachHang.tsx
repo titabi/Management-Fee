@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AmountInput } from '@/components/ui/amount-input'
-import { ShieldX, Plus, Trash2, Pencil, Wallet, TrendingDown, Users, ShieldCheck } from 'lucide-react'
+import { ShieldX, Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CATEGORIES = ['Phí dịch vụ', 'Vật tư', 'Nhân công', 'Thiết bị', 'Vận chuyển', 'Khác']
@@ -133,83 +133,27 @@ export default function ChiPhiKhachHang({ projectId, customerCosts, isAdmin, con
 
   return (
     <div className="mt-4 space-y-4">
-      {/* Mini Dashboard */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Wallet className="h-4 w-4 text-purple-500" />
-              <p className="text-xs text-purple-700 font-medium">CPKH</p>
-            </div>
-            <p className="text-lg font-bold text-purple-800">{formatVND(cpkh)}</p>
-            {contractValue ? <p className="text-xs text-purple-500 mt-0.5">{pct(cpkh, contractValue)} giá bán</p> : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-4 w-4 text-red-500" />
-              <p className="text-xs text-red-700 font-medium">Đã Trả KH</p>
-            </div>
-            <p className="text-lg font-bold text-red-800">{formatVND(daTraKH)}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-yellow-600" />
-              <p className="text-xs text-yellow-700 font-medium">Trả KH in Plan</p>
-            </div>
-            <p className="text-lg font-bold text-yellow-800">{formatVND(traKHinPlan)}</p>
-            <p className="text-xs text-yellow-600 mt-0.5">{customerCosts.length} mục chi phí</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-2 ${flexKH >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="h-4 w-4 text-blue-500" />
-              <p className="text-xs text-blue-700 font-medium">Flex KH</p>
-            </div>
-            <p className={`text-lg font-bold ${flexKH >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(flexKH)}</p>
-            <p className="text-xs text-blue-500 mt-0.5">CPKH − Đã trả − in Plan</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-200 bg-emerald-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Wallet className="h-4 w-4 text-emerald-500" />
-              <p className="text-xs text-emerald-700 font-medium">CPKH về Quỹ</p>
-            </div>
-            <p className="text-lg font-bold text-emerald-800">{formatVND(veQuy)}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-4 w-4 text-orange-500" />
-              <p className="text-xs text-orange-700 font-medium">CPKH phải Thu</p>
-            </div>
-            <p className={`text-lg font-bold ${phaiThu >= 0 ? 'text-orange-800' : 'text-red-700'}`}>{formatVND(phaiThu)}</p>
-            <p className="text-xs text-orange-500 mt-0.5">Flex KH − về Quỹ</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-2 ${inQuy >= 0 ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="h-4 w-4 text-green-600" />
-              <p className="text-xs text-green-700 font-medium">CPKH in Quỹ</p>
-            </div>
-            <p className={`text-lg font-bold ${inQuy >= 0 ? 'text-green-800' : 'text-red-700'}`}>{formatVND(inQuy)}</p>
-            <p className="text-xs text-green-600 mt-0.5">về Quỹ − Đã trả KH</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Mini Dashboard - dải số gọn */}
+      <Card>
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
+            {[
+              { label: 'CPKH', value: cpkh, cls: 'text-purple-700' },
+              { label: 'Đã Trả KH', value: daTraKH, cls: 'text-red-600' },
+              { label: 'Trả KH in Plan', value: traKHinPlan, cls: 'text-yellow-700' },
+              { label: 'Flex KH', value: flexKH, cls: flexKH >= 0 ? 'text-blue-700' : 'text-red-600' },
+              { label: 'Về Quỹ', value: veQuy, cls: 'text-emerald-600' },
+              { label: 'Phải Thu', value: phaiThu, cls: phaiThu >= 0 ? 'text-orange-600' : 'text-red-600' },
+              { label: 'in Quỹ', value: inQuy, cls: inQuy >= 0 ? 'text-green-700' : 'text-red-600', strong: true },
+            ].map((s, i) => (
+              <div key={s.label} className={`flex items-baseline gap-1.5 ${i === 6 ? 'lg:ml-auto lg:pl-4 lg:border-l' : ''}`}>
+                <span className="text-[11px] text-slate-400 uppercase tracking-wide">{s.label}</span>
+                <span className={`font-bold ${s.strong ? 'text-base' : 'text-sm'} ${s.cls}`}>{formatVND(s.value)}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Cost List */}
       <Card>

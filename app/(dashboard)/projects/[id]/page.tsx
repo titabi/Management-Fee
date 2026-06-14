@@ -82,58 +82,49 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </Badge>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-orange-700 font-medium">Tổng HĐ NCC/NTP</p>
-            <p className="text-lg font-bold text-orange-700">{formatVND(totalNccContract)}</p>
-          </CardContent>
-        </Card>
-        <Card className={controlNcc >= 0 ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}>
-          <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>Flex NCC/NTP</p>
-            <p className={`text-lg font-bold ${controlNcc >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{formatVND(controlNcc)}</p>
-          </CardContent>
-        </Card>
-        <Card className={controlKH >= 0 ? 'border-purple-200 bg-purple-50' : 'border-red-200 bg-red-50'}>
-          <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>Flex CPKH</p>
-            <p className={`text-lg font-bold ${controlKH >= 0 ? 'text-purple-700' : 'text-red-700'}`}>{formatVND(controlKH)}</p>
-          </CardContent>
-        </Card>
-        <Card className={totalManage >= 0 ? 'border-blue-300 bg-blue-100' : 'border-red-200 bg-red-50'}>
-          <CardContent className="pt-4 pb-3">
-            <p className={`text-xs font-medium ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>Flex Project</p>
-            <p className={`text-lg font-bold ${totalManage >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{formatVND(totalManage)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quỹ dự án */}
-      <Card className="border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50">
-        <CardContent className="pt-5 pb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-bold text-slate-700">💰 Quỹ dự án</span>
-            <span className="text-xs text-slate-400">Dòng tiền cá nhân của bạn trên dự án này</span>
+      {/* Tổng quan dự án (gộp 1 khối) */}
+      <Card className="border-slate-200 overflow-hidden">
+        {/* Hàng đầu: Flex Project (sổ quản lý hợp đồng) */}
+        <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-xs text-blue-200 font-medium">Flex Project</p>
+            <p className="text-2xl font-bold text-white tracking-tight">{formatVND(totalManage)}</p>
           </div>
+          <div className="flex gap-5 text-right">
+            <div>
+              <p className="text-[11px] text-blue-300">Flex NCC</p>
+              <p className="text-sm font-semibold text-white">{formatVND(controlNcc)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-blue-300">Flex CPKH</p>
+              <p className="text-sm font-semibold text-white">{formatVND(controlKH)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-blue-300">Tổng HĐ NCC</p>
+              <p className="text-sm font-semibold text-white">{formatVND(totalNccContract)}</p>
+            </div>
+          </div>
+        </div>
+        {/* Hàng dưới: Quỹ cá nhân (4 con số vàng) */}
+        <CardContent className="pt-4 pb-4">
+          <p className="text-xs text-slate-400 mb-2.5">💰 Quỹ dự án — dòng tiền cá nhân của bạn</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="rounded-lg bg-white border border-emerald-200 p-3">
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
               <p className="text-xs text-emerald-600 font-medium">Đang giữ</p>
               <p className={`text-lg font-bold ${dangGiu >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatVND(dangGiu)}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Đã về Quỹ − Đã chi</p>
             </div>
-            <div className="rounded-lg bg-white border border-amber-200 p-3">
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
               <p className="text-xs text-amber-600 font-medium">Phải thu</p>
               <p className={`text-lg font-bold ${phaiThu >= 0 ? 'text-amber-700' : 'text-red-600'}`}>{formatVND(phaiThu)}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Dự kiến về − Đã về Quỹ</p>
             </div>
-            <div className="rounded-lg bg-white border border-red-200 p-3">
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3">
               <p className="text-xs text-red-600 font-medium">Phải chi</p>
               <p className={`text-lg font-bold ${phaiChi <= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatVND(phaiChi)}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Cam kết chi − Đã chi</p>
             </div>
-            <div className="rounded-lg bg-white border-2 border-blue-300 p-3">
+            <div className="rounded-lg bg-blue-50 border-2 border-blue-300 p-3">
               <p className="text-xs text-blue-600 font-medium">Flex ròng</p>
               <p className={`text-lg font-bold ${flexRong >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(flexRong)}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">(Phải thu + Đang giữ) − Phải chi</p>
