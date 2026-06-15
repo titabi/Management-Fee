@@ -13,7 +13,13 @@ const statusLabels: Record<string, string> = {
   paused: 'Tạm dừng',
 }
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; q?: string }>
+}) {
+  const { status: statusFilter = 'all', q = '' } = await searchParams
+  const query = q.trim().toLowerCase()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -62,7 +68,37 @@ export default async function ProjectsPage() {
     return { ...project, flexProject, cpkh, cpkhInQuy, nccContract, nccInQuy, tongPhaiThu }
   })
 
-  const totals = projectsWithStats.reduce(
+  const allCount = projectsWithStats.length
+  const statusCounts = {
+    active: projectsWithStats.filter(p => p.status === 'active').length,
+    completed: projectsWithStats.filter(p => p.status === 'completed').length,
+    paused: projectsWithStats.filter(p => p.status === 'paused').length,
+  }
+
+  const filteredProjects = projectsWithStats.filter(p => {
+    const matchStatus = statusFilter === 'all' || p.status === statusFilter
+    const matchQuery = !query ||
+      p.name?.toLowerCase().includes(query) ||
+      p.code?.toLowerCase().includes(query) ||
+      p.client_name?.toLowerCase().includes(query)
+    return matchStatus && matchQuery
+  })
+
+  const filterTabs: { key: string; label: string; count: number }[] = [
+    { key: 'all', label: 'Tất cả', count: allCount },
+    { key: 'active', label: 'Đang hoạt động', count: statusCounts.active },
+    { key: 'completed', label: 'Hoàn thành', count: statusCounts.completed },
+    { key: 'paused', label: 'Tạm dừng', count: statusCounts.paused },
+  ]
+  const qs = (status: string) => {
+    const params = new URLSearchParams()
+    if (status !== 'all') params.set('status', status)
+    if (q) params.set('q', q)
+    const s = params.toString()
+    return s ? `/projects?${s}` : '/projects'
+  }
+
+  const totals = filteredProjects.reduce(
     (a, p) => ({
       flexProject: a.flexProject + p.flexProject,
       cpkh: a.cpkh + p.cpkh,
@@ -84,12 +120,48 @@ export default async function ProjectsPage() {
         {isAdmin && <CreateProjectDialog />}
       </div>
 
+      {/* Bộ lọc + tìm kiếm */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div className="flex flex-wrap gap-2">
+          {filterTabs.map(t => {
+            const active = statusFilter === t.key
+            return (
+              <Link
+                key={t.key}
+                href={qs(t.key)}
+                className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                  active
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                }`}
+              >
+                {t.label} <span className={active ? 'text-blue-100' : 'text-slate-400'}>({t.count})</span>
+              </Link>
+            )
+          })}
+        </div>
+        <form method="GET" action="/projects" className="flex gap-2">
+          {statusFilter !== 'all' && <input type="hidden" name="status" value={statusFilter} />}
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Tìm mã, tên, khách hàng..."
+            className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 focus:border-blue-400 focus:outline-none w-56"
+          />
+          <button type="submit" className="text-sm px-3 py-1.5 rounded-lg bg-slate-800 text-white hover:bg-slate-700">Tìm</button>
+          {q && <Link href={qs(statusFilter).replace(/[?&]q=[^&]*/, '')} className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100">Xóa</Link>}
+        </form>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Tất cả dự án ({projectsWithStats.length})</CardTitle>
+          <CardTitle className="text-base">
+            Dự án ({filteredProjects.length}{filteredProjects.length !== allCount ? ` / ${allCount}` : ''})
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {projectsWithStats.length > 0 ? (
+          {filteredProjects.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -107,7 +179,7 @@ export default async function ProjectsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {projectsWithStats.map((project) => (
+                  {filteredProjects.map((project) => (
                     <TableRow key={project.id} className="cursor-pointer hover:bg-slate-50">
                       <TableCell>
                         <Link href={`/projects/${project.id}`} className="block">
@@ -158,7 +230,7 @@ export default async function ProjectsPage() {
                 </TableBody>
                 <tfoot>
                   <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                    <TableCell colSpan={3} className="text-slate-700">Tổng cộng ({projectsWithStats.length} dự án)</TableCell>
+                    <TableCell colSpan={3} className="text-slate-700">Tổng cộng ({filteredProjects.length} dự án)</TableCell>
                     <TableCell className={`text-right ${totals.flexProject >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatVND(totals.flexProject)}</TableCell>
                     <TableCell className="text-right text-purple-700">{formatVND(totals.cpkh)}</TableCell>
                     <TableCell className={`text-right ${totals.cpkhInQuy >= 0 ? 'text-green-700' : 'text-red-600'}`}>{formatVND(totals.cpkhInQuy)}</TableCell>
@@ -172,8 +244,17 @@ export default async function ProjectsPage() {
             </div>
           ) : (
             <div className="text-center py-12 text-gray-500">
-              <p className="text-lg font-medium mb-2">Chưa có dự án nào</p>
-              {isAdmin && <p className="text-sm">Nhấn &quot;Tạo dự án mới&quot; để bắt đầu</p>}
+              {allCount === 0 ? (
+                <>
+                  <p className="text-lg font-medium mb-2">Chưa có dự án nào</p>
+                  {isAdmin && <p className="text-sm">Nhấn &quot;Tạo dự án mới&quot; để bắt đầu</p>}
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-medium mb-2">Không tìm thấy dự án phù hợp</p>
+                  <p className="text-sm">Thử đổi bộ lọc hoặc <Link href="/projects" className="text-blue-600 hover:underline">xóa tìm kiếm</Link></p>
+                </>
+              )}
             </div>
           )}
         </CardContent>
